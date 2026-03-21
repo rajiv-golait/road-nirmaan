@@ -16,8 +16,10 @@ ALTER TABLE complaint_events  ENABLE ROW LEVEL SECURITY;
 CREATE OR REPLACE FUNCTION get_user_role()
 RETURNS TEXT AS $$
   SELECT COALESCE(
-    (SELECT role FROM user_roles
-     WHERE email = (SELECT email FROM auth.users WHERE id = auth.uid())
+    (SELECT ur.role FROM user_roles ur
+     WHERE ur.user_id = auth.uid()
+        OR (ur.email IS NOT NULL
+            AND ur.email = (SELECT email FROM auth.users WHERE id = auth.uid()))
      LIMIT 1),
     'citizen'
   );

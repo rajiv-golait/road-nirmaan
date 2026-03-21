@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import '../../utils/demo_role_router.dart';
@@ -8,15 +10,17 @@ import 'package:image_picker/image_picker.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:exif/exif.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../services/complaint_store.dart';
 import '../../services/legacy_dashboard_adapter.dart';
 import '../../services/dashboard_metrics.dart';
 import '../../services/ai_recommendation_service.dart';
 import '../../services/flask_ai_service.dart';
+import '../../services/ward_assignment_service.dart';
 import '../../utils/app_flags.dart';
 import '../../utils/map_tile_config.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 
 // Color palette (top-level for all widgets)
 const Color primary = Color(0xFF4A5D6B);
@@ -169,6 +173,7 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
       ),
       floatingActionButton: _selectedIndex == 0
           ? FloatingActionButton.extended(
+              heroTag: 'citizen_fab_report_damage',
               onPressed: () {
                 Navigator.push(
                   context,
@@ -1589,6 +1594,7 @@ class _MapViewState extends State<_MapView> {
           top: 16,
           right: 16,
           child: FloatingActionButton.small(
+            heroTag: 'citizen_fab_map_recenter',
             onPressed: () => _mapController.move(_solapurCenter, 13),
             backgroundColor: Colors.white,
             child: const Icon(Icons.location_city, color: primary),
@@ -5255,6 +5261,115 @@ class _ComplaintCard extends StatelessWidget {
   }
 }
 
+double? _exifGpsRatiosToDecimal(IfdValues? values) {
+  if (values == null || values is! IfdRatios) return null;
+  double sum = 0;
+  var unit = 1.0;
+  for (final ratio in values.ratios) {
+    sum += ratio.toDouble() * unit;
+    unit /= 60.0;
+  }
+  return sum;
+}
+
+/// GPS embedded in the image (JPEG/HEIF EXIF). Returns null if missing or unsupported.
+Future<Position?> _gpsPositionFromExif(XFile xfile) async {
+  try {
+    final bytes = await xfile.readAsBytes();
+    final data = await readExifFromBytes(bytes);
+    if (data.isEmpty) return null;
+    final latTag = data['GPS GPSLatitude'];
+    final latRefTag = data['GPS GPSLatitudeRef'];
+    final lngTag = data['GPS GPSLongitude'];
+    final lngRefTag = data['GPS GPSLongitudeRef'];
+    if (latTag == null ||
+        lngTag == null ||
+        latRefTag == null ||
+        lngRefTag == null) {
+      return null;
+    }
+    var lat = _exifGpsRatiosToDecimal(latTag.values);
+    var lng = _exifGpsRatiosToDecimal(lngTag.values);
+    if (lat == null || lng == null) return null;
+    final latRef = latRefTag.printable.trim();
+    final lngRef = lngRefTag.printable.trim();
+    if (latRef == 'S' || latRef == 's') lat = -lat;
+    if (lngRef == 'W' || lngRef == 'w') lng = -lng;
+    return Position(
+      latitude: lat,
+      longitude: lng,
+      timestamp: DateTime.now(),
+      accuracy: 0,
+      altitude: 0,
+      altitudeAccuracy: 0,
+      heading: 0,
+      headingAccuracy: 0,
+      speed: 0,
+      speedAccuracy: 0,
+    );
+  } catch (e) {
+    debugPrint('GPS from EXIF: $e');
+    return null;
+  }
+}
+
+/// Picked-file preview: on web, [NetworkImage] + blob URLs in a [DecorationImage]
+/// often shows the same pixels for every tile (bad cache). Bytes + [Image.memory] per file fixes it.
+class _LocalXFileThumbnail extends StatefulWidget {
+  const _LocalXFileThumbnail({
+    super.key,
+    required this.xfile,
+  });
+
+  final XFile xfile;
+
+  @override
+  State<_LocalXFileThumbnail> createState() => _LocalXFileThumbnailState();
+}
+
+class _LocalXFileThumbnailState extends State<_LocalXFileThumbnail> {
+  Uint8List? _bytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LocalXFileThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.xfile.path != widget.xfile.path ||
+        oldWidget.xfile.name != widget.xfile.name) {
+      _bytes = null;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    final b = await widget.xfile.readAsBytes();
+    if (mounted) setState(() => _bytes = b);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_bytes == null) {
+      return const Center(
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    return Image.memory(
+      _bytes!,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+    );
+  }
+}
+
 // REPORT DAMAGE SCREEN
 class _ReportDamageScreen extends StatefulWidget {
   const _ReportDamageScreen();
@@ -5450,17 +5565,17 @@ class _ReportDamageScreenState extends State<_ReportDamageScreen> {
                                 offset: const Offset(0, 4),
                               ),
                             ],
-                            image: DecorationImage(
-                              image: kIsWeb
-                                  ? NetworkImage(entry.value.path)
-                                        as ImageProvider
-                                  : FileImage(File(entry.value.path)),
-                              fit: BoxFit.cover,
-                            ),
                             border: Border.all(
                               color: primary.withOpacity(0.2),
                               width: 2,
                             ),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: _LocalXFileThumbnail(
+                            key: ValueKey(
+                              '${entry.key}_${entry.value.path}_${entry.value.name}_${entry.value.hashCode}',
+                            ),
+                            xfile: entry.value,
                           ),
                         ),
                         // Aesthetic Location Badge
@@ -5732,30 +5847,34 @@ class _ReportDamageScreenState extends State<_ReportDamageScreen> {
     );
   }
 
-  Future<Position?> _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+  /// Prefer GPS from image EXIF (per file); otherwise browser / device location.
+  Future<Position?> _positionForPickedPhoto(XFile img) async {
+    final fromExif = await _gpsPositionFromExif(img);
+    return fromExif ?? await _getGPSLocationForPhoto();
+  }
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return null;
-    }
+  /// Fresh GPS snapshot when the image has no usable EXIF location (web / mobile).
+  Future<Position?> _getGPSLocationForPhoto() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return null;
 
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
         return null;
       }
-    }
 
-    if (permission == LocationPermission.deniedForever) {
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      ).timeout(const Duration(seconds: 10));
+    } catch (e) {
+      debugPrint('GPS error: $e');
       return null;
     }
-
-    return await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
   }
 
   void _addPhotos() async {
@@ -5774,30 +5893,24 @@ class _ReportDamageScreenState extends State<_ReportDamageScreen> {
       if (kIsWeb) {
         final picker = ImagePicker();
         final List<XFile> images = await picker.pickMultiImage();
-        if (images.isNotEmpty) {
+        if (images.isEmpty) return;
+
+        setState(() => _isDetectingLocation = true);
+        try {
+          final newPhotos = <XFile>[];
+          final newLocs = <Position?>[];
+          for (final img in images) {
+            if (_selectedPhotos.length + newPhotos.length >= 3) break;
+            newPhotos.add(img);
+            newLocs.add(await _positionForPickedPhoto(img));
+          }
+          if (!mounted) return;
           setState(() {
-            for (var img in images) {
-              if (_selectedPhotos.length < 3) {
-                _selectedPhotos.add(img);
-                // On web, just add a dummy location since GPS isn't guaranteed
-                _photoLocations.add(
-                  Position(
-                    longitude: 75.9064,
-                    latitude: 17.6599,
-                    timestamp: DateTime.now(),
-                    accuracy: 1,
-                    altitude: 1,
-                    heading: 1,
-                    speed: 1,
-                    speedAccuracy: 1,
-                    altitudeAccuracy: 1,
-                    headingAccuracy: 1,
-                    isMocked: true,
-                  ),
-                );
-              }
-            }
+            _selectedPhotos.addAll(newPhotos);
+            _photoLocations.addAll(newLocs);
           });
+        } finally {
+          if (mounted) setState(() => _isDetectingLocation = false);
         }
         return;
       }
@@ -5885,110 +5998,118 @@ class _ReportDamageScreenState extends State<_ReportDamageScreen> {
     final effectiveCategory = _selectedCategory == 'Other'
         ? _otherCategoryController.text.trim()
         : _selectedCategory;
-    final primaryPosition = _photoLocations.whereType<Position>().isNotEmpty
-        ? _photoLocations.whereType<Position>().first
-        : null;
 
     LatLng? coords;
-    bool locationIsApproximate = false;
+    var locationIsApproximate = false;
 
-    if (primaryPosition != null) {
-      coords = LatLng(primaryPosition.latitude, primaryPosition.longitude);
+    final positions = _photoLocations.whereType<Position>().toList();
+    if (positions.isNotEmpty) {
+      final sumLat =
+          positions.fold<double>(0, (a, p) => a + p.latitude) / positions.length;
+      final sumLng =
+          positions.fold<double>(0, (a, p) => a + p.longitude) / positions.length;
+      coords = LatLng(sumLat, sumLng);
     } else {
-      // FIX 2: Show blocking dialog — do not silently use hardcoded coordinates
-      final useApproximate = await showDialog<bool>(
+      final proceed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (_) => AlertDialog(
           title: const Text('Location unavailable'),
           content: const Text(
-            'Could not get your GPS location. '
-            'Use approximate Solapur city center '
-            'coordinates instead? '
-            'Your report will still be submitted '
-            'but location may be inaccurate.'),
+            'No GPS position was captured for your photos. '
+            'Submit without precise coordinates, or cancel and '
+            'enable location before trying again.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
+              child: const Text('Cancel'),
+            ),
             TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Use approximate')),
+              child: const Text('Submit anyway'),
+            ),
           ],
         ),
       );
-
-      if (useApproximate != true) return; // abort submit
-
-      coords = LatLng(17.6868, 75.9074);
+      if (proceed != true) return;
+      coords = null;
       locationIsApproximate = true;
     }
 
     final locationText = coords != null
         ? '${coords.latitude.toStringAsFixed(6)}, ${coords.longitude.toStringAsFixed(6)}'
-        : 'Location not detected';
-    final localPaths = _selectedPhotos.map((photo) => photo.path).toList();
-    final lat = coords?.latitude ?? 17.6868;
-    final lng = coords?.longitude ?? 75.9074;
+        : 'Location unavailable — submitted without GPS coordinates';
 
-    try {
-      final nearby = await ComplaintStore.instance.findNearbyOpenComplaints(
-        latitude: lat,
-        longitude: lng,
-      );
-      final nearbyPayload = nearby.map((item) {
-        final c = item['coords'] as LatLng?;
-        return <String, dynamic>{
-          'id': item['id']?.toString(),
-          'lat': c?.latitude,
-          'lng': c?.longitude,
-          'status': item['status']?.toString(),
-        };
-      }).toList();
-      final dedup = await FlaskAiService.checkDuplicate(
-        latitude: lat,
-        longitude: lng,
-        nearbyComplaints: nearbyPayload,
-      );
-      if ((dedup['is_duplicate'] == true) &&
-          (dedup['master_id']?.toString().isNotEmpty == true)) {
-        await ComplaintStore.instance.addEvidenceToComplaint(
-          complaintId: dedup['master_id'].toString(),
-          localImagePaths: localPaths,
+    final localPaths = _selectedPhotos.map((photo) => photo.path).toList();
+
+    final ward = coords != null
+        ? WardAssignmentService.assignZone(coords.latitude, coords.longitude)
+        : 'Unknown Area';
+
+    // Spatial dedup only when we have real GPS (no fake default coordinates).
+    if (coords != null) {
+      try {
+        final nearby = await ComplaintStore.instance.findNearbyOpenComplaints(
+          latitude: coords.latitude,
+          longitude: coords.longitude,
         );
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Duplicate complaint found. Evidence attached to existing complaint.',
+        final nearbyPayload = nearby.map((item) {
+          final c = item['coords'] as LatLng?;
+          return <String, dynamic>{
+            'id': item['id']?.toString(),
+            'lat': c?.latitude,
+            'lng': c?.longitude,
+            'status': item['status']?.toString(),
+          };
+        }).toList();
+        final dedup = await FlaskAiService.checkDuplicate(
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          nearbyComplaints: nearbyPayload,
+        );
+        if ((dedup['is_duplicate'] == true) &&
+            (dedup['master_id']?.toString().isNotEmpty == true)) {
+          await ComplaintStore.instance.addEvidenceToComplaint(
+            complaintId: dedup['master_id'].toString(),
+            localImagePaths: localPaths,
+          );
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Duplicate complaint found. Evidence attached to existing complaint.',
+              ),
+              backgroundColor: primary,
             ),
-            backgroundColor: primary,
+          );
+          return;
+        }
+      } catch (e) {
+        // Duplicate check failed — ask user what to do
+        final proceedAnyway = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Duplicate check unavailable'),
+            content: const Text(
+              'Could not check for nearby reports. '
+              'Do you want to submit anyway? '
+              'Your report might be a duplicate.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Submit anyway'),
+              ),
+            ],
           ),
         );
-        return;
+        if (proceedAnyway != true) return;
       }
-    } catch (e) {
-      // FIX 6: Duplicate check failed — ask user what to do
-      final proceedAnyway = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Duplicate check unavailable'),
-          content: const Text(
-            'Could not check for nearby reports. '
-            'Do you want to submit anyway? '
-            'Your report might be a duplicate.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Submit anyway')),
-          ],
-        ),
-      );
-      if (proceedAnyway != true) return;
-      // User explicitly chose to proceed — that's fine
     }
 
     Map<String, dynamic>? aiResult;
@@ -6004,16 +6125,16 @@ class _ReportDamageScreenState extends State<_ReportDamageScreen> {
       }
       aiResult = await FlaskAiService.analyzeImages(
         images: _selectedPhotos,
-        latitude: lat,
-        longitude: lng,
+        latitude: coords?.latitude,
+        longitude: coords?.longitude,
       );
     } catch (e) {
       debugPrint('AI Analysis fallback to local model: $e');
       try {
         aiResult = await AiRecommendationService.instance.analyzeSingleImage(
           imagePath: localPaths.first,
-          latitude: lat,
-          longitude: lng,
+          latitude: coords?.latitude,
+          longitude: coords?.longitude,
         );
       } catch (fallbackErr) {
         debugPrint('Local AI fallback failed: $fallbackErr');
@@ -6026,6 +6147,15 @@ class _ReportDamageScreenState extends State<_ReportDamageScreen> {
     int? totalPotholes;
     String? aiPriority;
     String? aiSource;
+    if (aiResult == null) {
+      aiSource = 'UNKNOWN';
+    } else if (aiResult['is_offline_estimate'] == true) {
+      aiSource = 'OFFLINE_ESTIMATE';
+    } else if (aiResult['success'] == true) {
+      aiSource = 'ROBOFLOW_REAL';
+    } else {
+      aiSource = 'UNKNOWN';
+    }
 
     if (aiResult != null && aiResult['success'] == true) {
       final String priority = aiResult['priority']?.toString() ?? 'MEDIUM';
@@ -6040,25 +6170,20 @@ class _ReportDamageScreenState extends State<_ReportDamageScreen> {
       severityScore = (aiResult['severity_score'] as num?)?.toDouble();
       epdoScore = (aiResult['epdo_score'] as num?)?.toDouble() ?? 5.0;
       totalPotholes = (aiResult['total_potholes'] as num?)?.toInt() ?? 1;
-      aiSource = aiResult['is_offline_estimate'] == true
-          ? 'OFFLINE_ESTIMATE'
-          : 'ROBOFLOW_REAL';
 
-      // FIX 1: Warn user when AI result is an offline estimate
       if (aiResult['is_offline_estimate'] == true && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
               'Could not reach AI server. '
               'Severity is an estimate. '
-              'Report will still be submitted.'),
+              'Report will still be submitted.',
+            ),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 5),
           ),
         );
       }
-    } else {
-      aiSource = 'UNKNOWN';
     }
 
     try {
@@ -6067,7 +6192,7 @@ class _ReportDamageScreenState extends State<_ReportDamageScreen> {
         description: _descriptionController.text.trim(),
         damageType: effectiveCategory,
         location: locationText,
-        ward: 'Ward Pending',
+        ward: ward,
         coords: coords,
         localImagePaths: localPaths,
         severity: severity,
@@ -6142,7 +6267,40 @@ class _ReportDamageScreenState extends State<_ReportDamageScreen> {
               'Your complaint has been registered in the backend and will be reviewed by municipal officials within 24-48 hours.',
               style: TextStyle(color: textSecondary, height: 1.4),
             ),
-            if (_photoLocations.any((loc) => loc != null)) ...[
+            if (severityScore != null ||
+                epdoScore != null ||
+                (totalPotholes != null && totalPotholes! > 0) ||
+                aiPriority != null) ...[
+              const SizedBox(height: 12),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text(
+                'AI analysis',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+              const SizedBox(height: 6),
+              if (severityScore != null)
+                Text(
+                  'Severity score: ${severityScore.toStringAsFixed(1)} / 10',
+                  style: const TextStyle(fontSize: 12, color: textSecondary),
+                ),
+              if (epdoScore != null)
+                Text(
+                  'EPDO score: ${epdoScore.toStringAsFixed(1)} / 10',
+                  style: const TextStyle(fontSize: 12, color: textSecondary),
+                ),
+              if (totalPotholes != null && totalPotholes! > 0)
+                Text(
+                  'Potholes detected: $totalPotholes',
+                  style: const TextStyle(fontSize: 12, color: textSecondary),
+                ),
+              if (aiPriority != null)
+                Text(
+                  'Priority: $aiPriority',
+                  style: const TextStyle(fontSize: 12, color: textSecondary),
+                ),
+            ],
+            if (coords != null) ...[
               const SizedBox(height: 12),
               const Divider(),
               const SizedBox(height: 8),
@@ -6155,7 +6313,7 @@ class _ReportDamageScreenState extends State<_ReportDamageScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Real-time location detected',
+                    'Location saved with report',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -6165,14 +6323,11 @@ class _ReportDamageScreenState extends State<_ReportDamageScreen> {
                 ],
               ),
               const SizedBox(height: 4),
-              Builder(
-                builder: (context) {
-                  final loc = _photoLocations.firstWhere((l) => l != null);
-                  return Text(
-                    'Location: ${loc!.latitude.toStringAsFixed(6)}, ${loc.longitude.toStringAsFixed(6)} (High Accuracy)',
-                    style: const TextStyle(fontSize: 11, color: textSecondary),
-                  );
-                },
+              Text(
+                'Coordinates: ${coords.latitude.toStringAsFixed(6)}, '
+                '${coords.longitude.toStringAsFixed(6)} '
+                '(mean of locations from your photos)',
+                style: const TextStyle(fontSize: 11, color: textSecondary),
               ),
             ],
           ],

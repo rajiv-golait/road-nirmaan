@@ -175,7 +175,8 @@ class LegacyDashboardAdapter {
             'title': c['title'],
             'location': c['coords'],
             'status': c['status'],
-            'color': _markerColor((c['status'] ?? '').toString()),
+            'epdoScore': c['epdoScore'],
+            'color': _markerColorFromEpdo((c['epdoScore'] as num?)?.toDouble()),
             'isMine': c['isMine'] ?? false,
             'address': c['location'],
             'submittedDate': _formatLegacyDate(c['submittedDate']),
@@ -245,24 +246,18 @@ class LegacyDashboardAdapter {
       'aiInputImage': complaint['aiInputImage'],
       'aiAnalyzedAt': complaint['aiAnalyzedAt'],
       'date': _legacyShortDate(complaint['submittedDate'] as DateTime?),
+      'epdoScore': complaint['epdoScore'],
+      'severityScore': complaint['severityScore'],
     };
   }
 
-  static Color _markerColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'resolved':
-        return Colors.green;
-      case 'pending ce authorization':
-      case 'pending approval':
-      case 'pending':
-        return Colors.orange;
-      case 'in progress':
-        return Colors.blue;
-      case 'escalated':
-        return Colors.red;
-      default:
-        return Colors.red;
-    }
+  /// Map pin color on commissioner (and shared) maps: EPDO-based priority.
+  /// Red ≥ 8, orange 5–8, green below 5; grey when score unknown.
+  static Color _markerColorFromEpdo(double? epdo) {
+    if (epdo == null) return Colors.grey.shade600;
+    if (epdo >= 8) return Colors.red;
+    if (epdo >= 5) return Colors.orange;
+    return Colors.green;
   }
 
   static String _legacyShortDate(DateTime? date) {
@@ -294,7 +289,9 @@ class LegacyDashboardAdapter {
     final isVerifiedStage =
         status == 'verified' ||
         status == 'in progress' ||
+        status == 'inprogress' ||
         status == 'pending ce authorization' ||
+        status == 'pendingceapproval' ||
         status == 'resolved';
     if (!isVerifiedStage) return false;
 

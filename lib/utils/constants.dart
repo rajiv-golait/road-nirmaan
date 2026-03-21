@@ -1,7 +1,6 @@
-/// Application constants
-///
-/// Centralized constants for the application
+import 'package:flutter/foundation.dart' show kIsWeb;
 
+/// Application constants — centralized for the app.
 class AppConstants {
   // App Info
   static const String appName = 'ROADNIRMAN';
@@ -18,11 +17,13 @@ class AppConstants {
 
   /// Flask AI backend. Override per run:
   /// `--dart-define=FLASK_URL=http://<LAN-IP>:5000` (real device)
-  /// Default matches Android emulator host loopback.
-  static const String flaskUrl = String.fromEnvironment(
-    'FLASK_URL',
-    defaultValue: 'http://10.0.2.2:5000',
-  );
+  /// Web → localhost; Android emulator → 10.0.2.2.
+  static String get flaskUrl {
+    const defined = String.fromEnvironment('FLASK_URL', defaultValue: '');
+    if (defined.isNotEmpty) return defined;
+    if (kIsWeb) return 'http://localhost:5000';
+    return 'http://10.0.2.2:5000';
+  }
 
   // Validation Constants
   static const int minTitleLength = 5;

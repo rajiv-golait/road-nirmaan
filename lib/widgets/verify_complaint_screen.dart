@@ -176,36 +176,69 @@ class _VerifyComplaintScreenState extends State<VerifyComplaintScreen> {
           );
         }
       } on TimeoutException {
-        // FIX 4: Verification server timed out — must not proceed
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Verification server timed out. '
-              'Please try again.'),
+              'Verification server unreachable. '
+              'Cannot verify without AI check. '
+              'Ensure Flask is running.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
         setState(() => _isSubmitting = false);
-        return; // do NOT proceed with status update
+        return;
       } catch (e) {
-        // FIX 4: Verification failed — must not proceed
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Verification failed: $e. '
-              'Cannot mark as resolved without '
-              'AI verification.'),
+              'Verification server unreachable. '
+              'Cannot verify without AI check. '
+              '(${e.toString()})',
+            ),
             backgroundColor: Colors.red,
           ),
         );
         setState(() => _isSubmitting = false);
-        return; // do NOT proceed with status update
+        return;
       }
 
-      final verdict = verificationResult?['verdict']?.toString();
+      if (verificationResult == null) {
+        if (!mounted) return;
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not run AI verification (missing before/after images).',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final verdict = verificationResult['verdict']?.toString();
       final isRepairVerified = verdict == 'REPAIR_VERIFIED';
+      final ssimScore = verificationResult['ssim_score'];
+      final hash = verificationResult['verification_hash']?.toString();
+
+      if (!isRepairVerified) {
+        if (!mounted) return;
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Repair rejected — surface appears unchanged. '
+              'SSIM score: ${ssimScore ?? '—'}. '
+              'Please complete the repair and resubmit.',
+            ),
+            backgroundColor: const Color(0xFFC75D5D),
+          ),
+        );
+        return;
+      }
 
       await ComplaintStore.instance
           .submitForCEAuthorization(widget.data['id'] as String, {
@@ -220,19 +253,22 @@ class _VerifyComplaintScreenState extends State<VerifyComplaintScreen> {
             'images': allImages,
             'beforeImages': beforeImages,
             'afterImages': afterImages,
-            if (verificationResult?['ssim_score'] != null)
-              'ssimScore': verificationResult?['ssim_score'],
-            if (verificationResult?['verification_hash'] != null)
-              'verificationHash': verificationResult?['verification_hash'],
+            if (ssimScore != null) 'ssimScore': ssimScore,
+            if (hash != null) 'verificationHash': hash,
             if (verdict != null) 'verificationStatus': verdict,
-            if (isRepairVerified) 'status': 'PendingCEApproval',
+            'status': 'PendingCEApproval',
           });
 
       if (!mounted) return;
+      final hashPrefix =
+          hash != null && hash.length >= 16 ? '${hash.substring(0, 16)}…' : '';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Submitted for City Engineer final authorization'),
-          backgroundColor: Color(0xFF7DB89A),
+        SnackBar(
+          content: Text(
+            'Repair verified ✓  SSIM: $ssimScore'
+            '${hashPrefix.isNotEmpty ? '  ·  Hash: $hashPrefix' : ''}',
+          ),
+          backgroundColor: const Color(0xFF7DB89A),
         ),
       );
       widget.onVerified();

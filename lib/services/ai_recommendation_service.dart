@@ -10,8 +10,8 @@ class AiRecommendationService {
 
   Future<Map<String, dynamic>> analyzeSingleImage({
     required String imagePath,
-    required double latitude,
-    required double longitude,
+    double? latitude,
+    double? longitude,
   }) async {
     try {
       final raw = await FlaskAiService.analyzeImages(
@@ -30,7 +30,11 @@ class AiRecommendationService {
       throw Exception('Flask returned success!=true');
     } catch (e) {
       debugPrint('AI: Flask unavailable, using offline fallback: $e');
-      return _fallbackAnalyze(imagePath, latitude, longitude);
+      return _fallbackAnalyze(
+        imagePath,
+        latitude ?? 0,
+        longitude ?? 0,
+      );
     }
   }
 

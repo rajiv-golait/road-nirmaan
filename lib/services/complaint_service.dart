@@ -53,6 +53,8 @@ class ComplaintService {
     required String eventType,
     String? remarks,
     Map<String, dynamic>? metadata,
+    String? fromStatus,
+    String? toStatus,
   }) async {
     try {
       await _client.from('complaint_events').insert({
@@ -62,6 +64,8 @@ class ComplaintService {
         'actor_email': _client.auth.currentUser?.email,
         'remarks': remarks,
         'metadata': metadata,
+        if (fromStatus != null) 'from_status': fromStatus,
+        if (toStatus != null) 'to_status': toStatus,
       });
     } catch (e) {
       debugPrint(
@@ -254,6 +258,10 @@ class ComplaintService {
     if (app.containsKey('reportedByUserId'))
       row['reported_by_user_id'] = app['reportedByUserId'];
     if (app.containsKey('upvotes')) row['upvotes'] = app['upvotes'];
+    if (app.containsKey('aiSource')) row['ai_source'] = app['aiSource'];
+    if (app.containsKey('locationIsApproximate')) {
+      row['location_is_approximate'] = app['locationIsApproximate'];
+    }
     return row;
   }
 
@@ -450,10 +458,22 @@ class ComplaintService {
       'escalatedFrom': currentHandler,
     });
     await _client.from('complaints').update(payload).eq('id', complaintId);
+    final ssim = verificationData['ssimScore'];
+    final vhash = verificationData['verificationHash'];
+    Map<String, dynamic>? meta;
+    if (ssim != null || vhash != null) {
+      meta = {
+        if (ssim != null) 'ssim_score': ssim,
+        if (vhash != null) 'verification_hash': vhash,
+      };
+    }
     await _recordEvent(
       complaintId: complaintId,
-      eventType: 'submitted_for_ce_authorization',
+      eventType: 'REPAIR_VERIFIED',
       remarks: verificationData['officialRemarks']?.toString(),
+      fromStatus: existingComplaint['status']?.toString(),
+      toStatus: 'PendingCEApproval',
+      metadata: meta,
     );
   }
 

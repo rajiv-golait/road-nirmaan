@@ -7,10 +7,13 @@ import '../utils/constants.dart';
 class FlaskAiService {
   static String get _baseUrl => AppConstants.flaskUrl;
 
+  /// Roboflow + scoring can exceed 15s; keep client in sync with Flask work.
+  static const Duration _httpTimeout = Duration(seconds: 90);
+
   static Future<Map<String, dynamic>> analyzeImages({
     required List<dynamic> images,
-    required double latitude,
-    required double longitude,
+    double? latitude,
+    double? longitude,
   }) async {
     debugPrint('═══ AI PIPELINE START ═══');
     debugPrint('Flask URL: $_baseUrl');
@@ -40,25 +43,33 @@ class FlaskAiService {
           );
         } else {
           try {
-            // Local path mobile
-            request.files.add(await http.MultipartFile.fromPath('images', img));
+            final xfile = XFile(img);
+            final bytes = await xfile.readAsBytes();
+            final name = img.split('/').last.split(r'\').last;
+            request.files.add(
+              http.MultipartFile.fromBytes(
+                'images',
+                bytes,
+                filename: name.isEmpty ? 'photo.jpg' : name,
+              ),
+            );
           } catch (e) {
             debugPrint('Failed to attach image: $e');
-            // Skip this image and continue with others
           }
         }
       }
     }
-    request.fields['latitude'] = latitude.toString();
-    request.fields['longitude'] = longitude.toString();
+    if (latitude != null && longitude != null) {
+      request.fields['latitude'] = latitude.toString();
+      request.fields['longitude'] = longitude.toString();
+    }
 
-    // The requirements specify applying a timeout and falling back gracefully
-    final response = await request.send().timeout(const Duration(seconds: 15));
-    final body = await response.stream.bytesToString();
+    final streamed = await request.send().timeout(_httpTimeout);
+    final body = await streamed.stream.bytesToString().timeout(_httpTimeout);
 
-    if (response.statusCode != 200) {
+    if (streamed.statusCode != 200) {
       throw Exception(
-        'Failed to analyze images. Status: ${response.statusCode}',
+        'Failed to analyze images. Status: ${streamed.statusCode}',
       );
     }
 
@@ -86,7 +97,7 @@ class FlaskAiService {
             'nearby_complaints': nearbyComplaints,
           }),
         )
-        .timeout(const Duration(seconds: 10));
+        .timeout(const Duration(seconds: 30));
     if (response.statusCode != 200) {
       throw Exception('Duplicate check failed: ${response.statusCode}');
     }
@@ -117,7 +128,17 @@ class FlaskAiService {
             http.MultipartFile.fromBytes(field, bytes, filename: '$field.jpg'),
           );
         } else {
-          request.files.add(await http.MultipartFile.fromPath(field, image));
+          final path = image;
+          final xfile = XFile(path);
+          final bytes = await xfile.readAsBytes();
+          final name = path.split('/').last.split(r'\').last;
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              field,
+              bytes,
+              filename: name.isEmpty ? '$field.jpg' : name,
+            ),
+          );
         }
       } else {
         throw Exception('Unsupported image type for $field');
@@ -128,10 +149,10 @@ class FlaskAiService {
     await addImage('after_image', afterImage);
     request.fields['complaint_id'] = complaintId;
 
-    final response = await request.send().timeout(const Duration(seconds: 15));
-    final body = await response.stream.bytesToString();
-    if (response.statusCode != 200) {
-      throw Exception('Verify repair failed: ${response.statusCode}');
+    final streamed = await request.send().timeout(_httpTimeout);
+    final body = await streamed.stream.bytesToString().timeout(_httpTimeout);
+    if (streamed.statusCode != 200) {
+      throw Exception('Verify repair failed: ${streamed.statusCode}');
     }
     return jsonDecode(body) as Map<String, dynamic>;
   }

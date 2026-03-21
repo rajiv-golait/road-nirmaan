@@ -24,11 +24,16 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- ──────────────────────────────────────
 CREATE TABLE IF NOT EXISTS user_roles (
   id        UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id   UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   email     TEXT UNIQUE NOT NULL,
   role      TEXT NOT NULL DEFAULT 'citizen',
   ward_zone TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS user_roles_user_id_unique
+  ON user_roles (user_id)
+  WHERE user_id IS NOT NULL;
 
 -- ──────────────────────────────────────
 -- 3. complaints

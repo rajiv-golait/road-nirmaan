@@ -95,6 +95,10 @@ BEGIN
     ALTER TABLE user_roles ADD COLUMN ward_zone TEXT;
   END IF;
 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_roles' AND column_name = 'user_id') THEN
+    ALTER TABLE user_roles ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
+  END IF;
+
   -- Columns that may be missing in profiles
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'ward_zone') THEN
     ALTER TABLE profiles ADD COLUMN ward_zone TEXT;
@@ -122,3 +126,33 @@ CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints (status);
 UPDATE complaints SET status = 'Open' WHERE status = 'New';
 UPDATE complaints SET status = 'InProgress' WHERE status = 'In Progress';
 UPDATE complaints SET status = 'PendingCEApproval' WHERE status IN ('Pending CE Authorization', 'Pending CE Approval');
+
+-- ──────────────────────────────────────
+-- user_roles.user_id — backfill from auth.users; RLS helper
+-- ──────────────────────────────────────
+UPDATE user_roles ur
+SET user_id = au.id
+FROM auth.users au
+WHERE ur.email IS NOT NULL
+  AND LOWER(TRIM(ur.email)) = LOWER(TRIM(au.email))
+  AND (ur.user_id IS NULL OR ur.user_id IS DISTINCT FROM au.id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS user_roles_user_id_unique
+  ON user_roles (user_id)
+  WHERE user_id IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION get_user_role()
+RETURNS TEXT AS $$
+  SELECT COALESCE(
+    (SELECT ur.role FROM user_roles ur
+     WHERE ur.user_id = auth.uid()
+        OR (ur.email IS NOT NULL
+            AND ur.email = (SELECT email FROM auth.users WHERE id = auth.uid()))
+     LIMIT 1),
+    'citizen'
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+-- Optional one-time cleanup after app started assigning Zone 1–6:
+-- UPDATE complaints SET ward_zone = 'Zone 2'
+-- WHERE ward_zone = 'Ward Pending' OR ward_zone IS NULL;

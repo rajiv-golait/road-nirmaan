@@ -16,6 +16,7 @@ import '../../utils/escalation_config.dart';
 import '../../services/ward_assignment_service.dart';
 import '../../utils/app_flags.dart';
 import '../../utils/map_tile_config.dart';
+import '../../widgets/verify_complaint_screen.dart';
 
 // Color palette (top-level for all widgets)
 const Color primary = Color(0xFF4A5D6B);
@@ -1849,6 +1850,9 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
     'Solapur Road Builders',
     'Maharashtra Infra Corp',
     'City Maintenance Services',
+    'contractor1@smcsolapur.gov.in',
+    'contractor2@smcsolapur.gov.in',
+    'contractor@company.com',
   ];
 
   final List<String> _workGangs = [
@@ -1866,6 +1870,9 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
     final isVerified =
         widget.data['status'] == 'Verified' ||
         widget.data['status'] == 'InProgress';
+    final statusStr = (widget.data['status'] ?? '').toString();
+    final canVerifyRepair =
+        statusStr == 'InProgress' && statusStr != 'PendingCEApproval';
 
     return Scaffold(
       backgroundColor: background,
@@ -1931,37 +1938,15 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
             const SizedBox(height: 20),
           ],
 
-          // ACTION BUTTONS (for new complaints)
-          if (isNew) ...[
-            _buildSectionTitle('Actions Required'),
+          // Repair verification (assigned InProgress work — real SSIM via VerifyComplaintScreen)
+          if (canVerifyRepair) ...[
+            _buildSectionTitle('Repair verification'),
             const SizedBox(height: 12),
             _buildActionButton(
-              'Verify Complaint',
+              'Verify repair',
               Icons.verified_outlined,
               const Color(0xFF7DB89A),
-              () => _showVerifyDialog(),
-            ),
-            const SizedBox(height: 12),
-            _buildActionButton(
-              'Assign to Contractor',
-              Icons.business_outlined,
-              const Color(0xFF4A90D9),
-              () => _showAssignContractorDialog(),
-            ),
-            const SizedBox(height: 12),
-            _buildActionButton(
-              'Assign Work Gang',
-              Icons.engineering_outlined,
-              const Color(0xFFC9A24D),
-              () => _showAssignWorkGangDialog(),
-            ),
-            const SizedBox(height: 12),
-            _buildActionButton(
-              'Escalate to Chief Engineer',
-              Icons.arrow_upward_rounded,
-              Colors.orange,
-              () => _showEscalateDialog(),
-              isDestructive: true,
+              _openVerifyRepairScreen,
             ),
             const SizedBox(height: 20),
           ],
@@ -2488,34 +2473,19 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
     return raw;
   }
 
-  void _showVerifyDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Verify Complaint'),
-        content: const Text(
-          'Mark this complaint as verified after field inspection?',
+  void _openVerifyRepairScreen() {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VerifyComplaintScreen(
+          data: widget.data,
+          contractors: _contractors,
+          workGangs: _workGangs,
+          onVerified: () {
+            Navigator.pop(context);
+            ComplaintStore.instance.fetchComplaints();
+          },
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Complaint verified successfully'),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF7DB89A),
-            ),
-            child: const Text('Verify'),
-          ),
-        ],
       ),
     );
   }

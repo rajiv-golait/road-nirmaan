@@ -887,7 +887,7 @@ class ComplaintStore extends ChangeNotifier {
       'reportedBy': 'citizen',
       'reportedByUserId': currentUserId,
       'upvotes': 0,
-      if (aiSource != null) 'aiSource': aiSource,
+      'aiSource': aiSource ?? 'UNKNOWN',
       'locationIsApproximate': locationIsApproximate,
     };
 

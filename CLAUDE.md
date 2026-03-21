@@ -28,8 +28,11 @@ flutter test
 ### Flask Backend
 ```bash
 cd "AI Integration"
-pip install -r requirements.txt
-python app.py  # Runs on http://localhost:5000
+# Recommended: use a venv (system Python may lack pip or Flask)
+uv venv .venv
+uv pip install -r requirements.txt --python .venv/Scripts/python.exe   # Windows
+# uv pip install -r requirements.txt --python .venv/bin/python         # macOS/Linux
+.venv/Scripts/python.exe app.py   # Windows — http://localhost:5000
 ```
 
 ### Environment Setup

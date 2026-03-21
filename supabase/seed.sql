@@ -420,3 +420,11 @@ SET severity_score = COALESCE(
 )
 WHERE severity_score IS NULL;
 
+-- Link user_roles to auth.users when accounts exist (requires user_roles.user_id from schema/migrate)
+UPDATE user_roles ur
+SET user_id = au.id
+FROM auth.users au
+WHERE ur.email IS NOT NULL
+  AND LOWER(TRIM(ur.email)) = LOWER(TRIM(au.email))
+  AND (ur.user_id IS NULL OR ur.user_id IS DISTINCT FROM au.id);
+

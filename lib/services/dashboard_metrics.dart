@@ -12,7 +12,10 @@ class DashboardMetrics {
   static int inProgress(List<Map<String, dynamic>> complaints) {
     return complaints.where((complaint) {
       final status = _statusOf(complaint);
-      return status == 'in progress' || status == 'pending ce authorization';
+      return status == 'in progress' ||
+          status == 'inprogress' ||
+          status == 'pending ce authorization' ||
+          status == 'pendingceapproval';
     }).length;
   }
 
@@ -21,7 +24,9 @@ class DashboardMetrics {
       final status = _statusOf(complaint);
       return status != 'resolved' &&
           status != 'in progress' &&
-          status != 'pending ce authorization';
+          status != 'inprogress' &&
+          status != 'pending ce authorization' &&
+          status != 'pendingceapproval';
     }).length;
   }
 
