@@ -839,6 +839,17 @@ class _JEDeskCard extends StatelessWidget {
                 color: textPrimary,
               ),
             ),
+            if (data['epdoScore'] != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'EPDO ${(data['epdoScore'] as num).toStringAsFixed(1)} / 10',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             const SizedBox(height: 4),
 
             // LOCATION + WARD
@@ -1929,6 +1940,9 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
           _buildComplaintHeader(),
           const SizedBox(height: 20),
 
+          _buildAiAssessmentSection(),
+          const SizedBox(height: 20),
+
           // IMAGES
           if (widget.data['images'] != null)
             _buildImageCarousel(widget.data['images'] as List<dynamic>),
@@ -2085,6 +2099,156 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
               color: textSecondary.withOpacity(0.8),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  bool _jeHasAiAssessmentData(Map<String, dynamic> d) {
+    final sev = d['severityScore'] as num?;
+    final epdo = d['epdoScore'] as num?;
+    final pots = d['totalPotholes'] as num?;
+    final pScore = d['priorityScore'] as num?;
+    final src = d['aiSource']?.toString().trim() ?? '';
+    final rec = d['aiRecommendation'];
+    final hasRec = rec is Map && rec.isNotEmpty;
+    final hasNumbers =
+        sev != null || epdo != null || pots != null || pScore != null;
+    final srcMeaningful = src.isNotEmpty && src.toUpperCase() != 'UNKNOWN';
+    return hasNumbers || hasRec || srcMeaningful;
+  }
+
+  String _jeHumanizeAiSource(String? raw) {
+    switch ((raw ?? '').toUpperCase()) {
+      case 'ROBOFLOW_REAL':
+        return 'AI analysis (Roboflow)';
+      case 'OFFLINE_ESTIMATE':
+        return 'Offline estimate (server unreachable)';
+      case 'UNKNOWN':
+        return 'Unknown / not recorded';
+      default:
+        if (raw == null || raw.isEmpty) return 'Unknown';
+        return raw;
+    }
+  }
+
+  Widget _jeAiMetricRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 132,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: textSecondary),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _jeRepairGuidanceFromMap(Map<String, dynamic> m) {
+    final out = <Widget>[];
+    void add(String key, String label) {
+      final v = m[key];
+      if (v != null && v.toString().trim().isNotEmpty) {
+        out.add(_jeAiMetricRow(label, v.toString()));
+      }
+    }
+
+    add('recommended_road_type', 'Road material');
+    add('worker_type', 'Worker type');
+    add('urgency', 'Urgency');
+    add('timeline', 'Timeline');
+    final summary = m['summary']?.toString().trim();
+    if (summary != null && summary.isNotEmpty) {
+      out.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            summary,
+            style: const TextStyle(
+              fontSize: 12,
+              color: textPrimary,
+              height: 1.35,
+            ),
+          ),
+        ),
+      );
+    }
+    return out;
+  }
+
+  Widget _buildAiAssessmentSection() {
+    final d = widget.data;
+    if (!_jeHasAiAssessmentData(d)) {
+      return const SizedBox.shrink();
+    }
+    final sev = d['severityScore'] as num?;
+    final epdo = d['epdoScore'] as num?;
+    final pots = d['totalPotholes'] as num?;
+    final pScore = d['priorityScore'] as num?;
+    final src = d['aiSource']?.toString() ?? 'UNKNOWN';
+    final rec = d['aiRecommendation'];
+    final recMap = rec is Map ? Map<String, dynamic>.from(rec) : null;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: primary.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: primary.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.auto_awesome, size: 18, color: primary),
+              const SizedBox(width: 8),
+              const Text(
+                'AI assessment',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (sev != null) _jeAiMetricRow('Severity score', '${sev.toStringAsFixed(1)} / 10'),
+          if (epdo != null) _jeAiMetricRow('EPDO score', '${epdo.toStringAsFixed(1)} / 10'),
+          if (pots != null) _jeAiMetricRow('Potholes detected', '${pots.round()}'),
+          if (pScore != null) _jeAiMetricRow('Priority score', pScore.toStringAsFixed(2)),
+          _jeAiMetricRow('Source', _jeHumanizeAiSource(src)),
+          if (recMap != null && recMap.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'Repair guidance',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: textSecondary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ..._jeRepairGuidanceFromMap(recMap),
+          ],
         ],
       ),
     );

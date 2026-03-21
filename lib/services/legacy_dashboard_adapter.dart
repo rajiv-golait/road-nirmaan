@@ -248,6 +248,9 @@ class LegacyDashboardAdapter {
       'date': _legacyShortDate(complaint['submittedDate'] as DateTime?),
       'epdoScore': complaint['epdoScore'],
       'severityScore': complaint['severityScore'],
+      'totalPotholes': complaint['totalPotholes'],
+      'priorityScore': complaint['priorityScore'],
+      'aiSource': complaint['aiSource'],
     };
   }
 

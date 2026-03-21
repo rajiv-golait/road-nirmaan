@@ -1,271 +1,247 @@
-# RoadNirman
+# Road Nirman
 
-**Smart road damage reporting and municipal workflow** for Solapur Municipal Corporation — citizen complaints, AI-assisted severity (Roboflow + Flask), escalation (JE → AE → DE → CE), and role-based dashboards (engineers, contractor, commissioner).
+**Road Nirman** is an end-to-end **smart road damage reporting and response system** aimed at municipal operations (demo context: **Solapur Municipal Corporation**). Citizens report damage with photos and location; a **Flask** service runs **Roboflow** pothole detection and computes **severity** and **EPDO-style** risk scores; **Supabase** stores complaints, auth, images, and audit events; **Flutter** delivers role-based dashboards from junior engineer through commissioner, plus contractors and verification (including **SSIM** repair checks).
 
 **Repository:** [github.com/rajiv-golait/road-nirmaan](https://github.com/rajiv-golait/road-nirmaan)
 
 ---
 
-## Table of contents
+## Why this exists
 
-1. [Features](#features)
-2. [Architecture](#architecture)
-3. [Repository layout](#repository-layout)
-4. [Prerequisites](#prerequisites)
-5. [Quick start](#quick-start)
-6. [Environment variables](#environment-variables)
-7. [Supabase (database, auth, storage)](#supabase-database-auth-storage)
-8. [Flutter app](#flutter-app)
-9. [Flask AI backend](#flask-ai-backend)
-10. [Real device vs emulator (Flask URL)](#real-device-vs-emulator-flask-url)
-11. [Compile-time flags (`--dart-define`)](#compile-time-flags---dart-define)
-12. [Demo & judging](#demo--judging)
-13. [Troubleshooting](#troubleshooting)
-14. [License](#license)
+Traditional complaint systems are often **reactive** and **disconnected** from evidence and prioritization. Road Nirman ties **geo-tagged multimedia**, **AI-assisted assessment**, **duplicate detection** near existing open cases, **SLA-aware escalation** (JE → AE → DE → CE), and **traceable workflows** so field staff see the same scores and history that the system stores.
 
 ---
 
-## Features
+## What you get
 
-- **Citizens** — Submit reports with photos, GPS (or approximate location), AI analysis, duplicate detection near existing open complaints.
-- **Offline resilience** — Local-only complaint IDs if Supabase insert fails; optional mock data when explicitly enabled.
-- **Staff dashboards** — Junior engineer through commissioner: maps, SLA-style escalation, assignments, verification flows.
-- **AI pipeline** — Images → Flask `/detect-flutter` → Roboflow pothole detection → severity / EPDO-style scoring; optional offline estimate if Flask is unreachable.
-- **Repair verification** — Before/after images and SSIM via Flask `/verify-repair`.
+| Capability | Details |
+|------------|---------|
+| Citizen reporting | Web/mobile flows: photos, GPS or photo EXIF where available, category, duplicate check before create |
+| AI analysis | Multipart upload to Flask `/detect-flutter` → Roboflow → severity / EPDO / priority; optional offline estimate if the server is unreachable |
+| Spatial dedup | Nearby open complaints within a radius (Flask `/check-duplicate` + Haversine) |
+| Operations | Ward-aware lists, maps (Mapbox tiles), SLA indicators, assignments, contractor and CE verification paths |
+| Repair proof | Before/after images and SSIM via `/verify-repair` |
+| Governance | `complaint_events` and RLS-oriented schema for audit-friendly storage |
 
 ---
 
 ## Architecture
 
-```
-┌─────────────────┐     ┌──────────────────────────┐     ┌─────────────────┐
-│  Flutter app    │────▶│  Supabase                │     │  Mapbox         │
-│  (Material 3)   │     │  PostgreSQL + Auth +     │     │  tiles / geo    │
-│                 │     │  Storage                 │     └─────────────────┘
-└────────┬────────┘     └──────────────────────────┘
-         │
-         │  HTTP (multipart / JSON)
-         ▼
-┌─────────────────┐     ┌──────────────────────────┐
-│  Flask (Python) │────▶│  Roboflow Inference API  │
-│  AI Integration/│     │  (pothole detection)       │
-└─────────────────┘     └──────────────────────────┘
+```mermaid
+flowchart LR
+  subgraph client [Flutter]
+    UI[Material3_Dashboards]
+  end
+  subgraph cloud [Supabase]
+    PG[(PostgreSQL)]
+    Auth[Auth]
+    Storage[Storage]
+  end
+  subgraph ai [AI]
+    Flask[Flask_app]
+    RF[Roboflow_API]
+  end
+  subgraph maps [Maps]
+    MB[Mapbox_tiles]
+  end
+  UI --> PG
+  UI --> Auth
+  UI --> Storage
+  UI -->|"multipart_JSON"| Flask
+  Flask --> RF
+  UI --> MB
 ```
 
-Central state: **`ComplaintStore`** (singleton) + **`ComplaintService`** (Supabase CRUD). See `CLAUDE.md` in the repo for deeper file-level relationships.
+- **State:** `ComplaintStore` (singleton `ChangeNotifier`) coordinates UI; **`ComplaintService`** persists to Supabase and updates the store.
+- **Timers:** `main.dart` runs auto-escalation on an interval and on resume (see `lib/utils/escalation_config.dart`).
+- **Deeper file map:** [`CLAUDE.md`](CLAUDE.md).
 
 ---
 
 ## Repository layout
 
-| Path | Purpose |
-|------|--------|
-| `lib/` | Flutter UI, services, models, utils |
-| `AI Integration/` | Flask app: `/detect-flutter`, `/check-duplicate`, `/verify-repair`, `/health` |
-| `supabase/` | SQL: `schema.sql`, `rls.sql`, `storage.sql`, `migrate.sql`, `seed.sql`, `demo_accounts.sql` |
-| `assets/` | Images and static assets |
-| `.vscode/launch.json` | Optional **dart-define** presets (e.g. emulator vs real device Flask URL) |
-| `.env.example` | Template for secrets — copy to `.env` (not committed) |
+| Path | Role |
+|------|------|
+| [`lib/`](lib/) | Flutter app: screens, services (`complaint_store.dart`, `complaint_service.dart`, `flask_ai_service.dart`, …), widgets |
+| [`AI Integration/`](AI%20Integration/) | Flask: `app.py` — `/detect-flutter`, `/check-duplicate`, `/verify-repair`, `/health` |
+| [`supabase/`](supabase/) | `schema.sql`, `rls.sql`, `migrate.sql`, `seed.sql`, `demo_accounts.sql`, optional `storage.sql` |
+| [`docs/`](docs/) | [`DEMO_WORKFLOWS.md`](docs/DEMO_WORKFLOWS.md), [`FINAL_SUBMISSION_SAMVED_2026.md`](docs/FINAL_SUBMISSION_SAMVED_2026.md) |
+| [`assets/`](assets/) | Static assets |
+| [`.env.example`](.env.example) | Copy to `.env` (not committed) |
 
 ---
 
 ## Prerequisites
 
-| Tool | Notes |
-|------|--------|
-| **Flutter** | SDK ≥ 3.10 (see `pubspec.yaml` `environment.sdk`) |
-| **Dart** | Bundled with Flutter |
-| **Python** | 3.9+ recommended for Flask backend |
-| **Supabase** | Project + SQL access (SQL Editor) |
-| **Mapbox** | Public token for map tiles / geocoding (Flutter + Flask) |
-| **Roboflow** | API key for inference (serverless URL in `requirements.txt` / env) |
+| Requirement | Notes |
+|-------------|--------|
+| Flutter | SDK compatible with `pubspec.yaml` (e.g. ^3.10) |
+| Dart | Ships with Flutter |
+| Python | 3.9+ for Flask; using **`uv`** + a project venv is recommended (see below) |
+| Supabase project | For Postgres, Auth, Storage |
+| Mapbox token | Public token for tiles / related features (`--dart-define=MAPBOX_TOKEN=...`) |
+| Roboflow | API key in root `.env` for Flask (required to start `app.py`) |
 
 ---
 
 ## Quick start
 
-### 1. Clone and install Flutter dependencies
+### 1. Clone and install Flutter deps
 
 ```bash
-cd Road_Nirman-main
+git clone https://github.com/rajiv-golait/road-nirmaan.git
+cd road-nirmaan
 flutter pub get
 ```
 
-### 2. Configure environment
+### 2. Environment files
 
 ```bash
 cp .env.example .env
-# Edit .env: MAPBOX_ACCESS_TOKEN, ROBOFLOW_* (for Flask). See below.
 ```
 
-### 3. Apply Supabase SQL (order matters)
+Edit **project root** `.env` (Flask loads it from the parent of `AI Integration/`):
 
-In **Supabase Dashboard → SQL Editor**, run in order:
+- `MAPBOX_ACCESS_TOKEN` — geocoding / map context in Flask
+- `ROBOFLOW_API_KEY` — **required** for inference
+- Optional: `ROBOFLOW_MODEL_ID`, `ROBOFLOW_API_URL`
 
-1. `supabase/schema.sql` — tables
-2. `supabase/rls.sql` — row level security
-3. `supabase/storage.sql` — storage buckets (if used)
-4. `supabase/migrate.sql` — additive columns on existing DBs
-5. `supabase/seed.sql` — optional demo data (e.g. 50 complaints + `user_roles` seeds)
+Configure the Flutter app with your **Supabase URL** and **anon key** in [`lib/main.dart`](lib/main.dart) (or refactor to `--dart-define` / a small config module if you prefer not to hardcode).
 
-### 4. Flutter: point Supabase URL + anon key
+### 3. Supabase SQL (order matters)
 
-The app initializes Supabase in `lib/main.dart` (`Supabase.initialize(...)`). Replace with your project URL and **anon** key, or refactor to `--dart-define` or a config loader if you prefer not to hardcode.
+In **Supabase → SQL Editor**, run in order:
 
-### 5. Run Flask backend
+1. `supabase/schema.sql`
+2. `supabase/rls.sql`
+3. `supabase/storage.sql` (if you use Storage buckets from this repo)
+4. `supabase/migrate.sql`
+5. `supabase/seed.sql` (optional demo data)
+6. `supabase/demo_accounts.sql` (optional; after creating matching Auth users)
+
+### 4. Flask backend (recommended: `uv`)
 
 ```bash
 cd "AI Integration"
-pip install -r requirements.txt
-python app.py
+uv venv .venv
+uv pip install -r requirements.txt --python .venv/Scripts/python.exe
+# Linux/macOS: --python .venv/bin/python
+.venv/Scripts/python.exe app.py
 ```
 
-Listens on **`0.0.0.0:5000`** (reachable from LAN for physical devices). Check **`GET /health`** for JSON status and `roboflow_key_set` / `mapbox_key_set`.
+Server listens on **`0.0.0.0:5000`**. Check **`GET http://127.0.0.1:5000/health`**.
 
-### 6. Run the Flutter app
+### 5. Run the Flutter app
+
+**Android emulator** (Flask on host):
 
 ```bash
-flutter run --dart-define=MAPBOX_TOKEN=YOUR_PK_TOKEN --dart-define=FLASK_URL=http://YOUR_LAN_IP:5000
+flutter run --dart-define=MAPBOX_TOKEN=YOUR_PK_TOKEN
+# Default FLASK_URL in code targets 10.0.2.2:5000 for emulator
 ```
 
-Use **`FLASK_URL=http://10.0.2.2:5000`** (default in `lib/utils/constants.dart`) only for **Android emulator**; use your PC’s **LAN IP** for a **physical phone** on the same Wi‑Fi.
+**Web / Chrome** (Flask on same machine):
+
+```bash
+flutter run -d chrome --dart-define=MAPBOX_TOKEN=YOUR_PK_TOKEN --dart-define=FLASK_URL=http://localhost:5000
+```
+
+**Physical device** on the same LAN as your PC:
+
+```bash
+flutter run --dart-define=MAPBOX_TOKEN=YOUR_PK_TOKEN --dart-define=FLASK_URL=http://YOUR_PC_LAN_IP:5000
+```
+
+Allow **inbound TCP 5000** on Windows Firewall for LAN testing.
+
+### 6. Quality checks
+
+```bash
+flutter analyze
+flutter test
+```
 
 ---
 
-## Environment variables
+## Environment and flags
 
-### Project root `.env` (Flask / Python)
-
-Used by `AI Integration/app.py` (loaded from repo root). **Do not commit `.env`.**
+### Root `.env` (Python / Flask)
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `MAPBOX_ACCESS_TOKEN` | Strongly recommended | Geocoding in Flask; Mapbox-backed features |
-| `ROBOFLOW_API_KEY` | **Required** (app raises if missing) | Roboflow inference |
-| `ROBOFLOW_MODEL_ID` | Optional | Default: `pothole-detection-gv5e7/3` |
-| `ROBOFLOW_API_URL` | Optional | Default: `https://serverless.roboflow.com` |
+| `ROBOFLOW_API_KEY` | Yes | Roboflow serverless inference |
+| `MAPBOX_ACCESS_TOKEN` | Strongly recommended | Location context in scoring pipeline |
+| `ROBOFLOW_MODEL_ID` | No | Default model id in `app.py` / env |
+| `ROBOFLOW_API_URL` | No | Default serverless base URL |
 
-Copy from **`.env.example`** and fill in real values.
+### Flutter `--dart-define`
 
-### Flutter
-
-- **`MAPBOX_TOKEN`** — pass via `--dart-define=MAPBOX_TOKEN=...` for map tiles (`lib/utils/map_tile_config.dart`).
-- **`FLASK_URL`** — pass via `--dart-define=FLASK_URL=...` (see [constants.dart](lib/utils/constants.dart)).
-
----
-
-## Supabase (database, auth, storage)
-
-- **Tables** — `complaints`, `profiles`, `user_roles`, `complaint_votes`, `complaint_events`, etc. (see `schema.sql`).
-- **Auth** — Email/password; register citizens in-app; create staff accounts in Supabase Auth and align `user_roles` / `profiles`.
-- **Storage** — Complaint images uploaded via app services (see `storage.sql` for buckets/policies).
-
-Optional demo SQL: **`supabase/demo_accounts.sql`** (after creating matching users in Auth).
+| Flag | Role |
+|------|------|
+| `MAPBOX_TOKEN` | Map tiles / map-related config |
+| `FLASK_URL` | Base URL for AI HTTP client ([`lib/utils/constants.dart`](lib/utils/constants.dart)) |
+| `ALLOW_MOCK_DATA` | When `true`, enables mock/seeder paths for development |
+| `ALLOW_DEMO_LOGIN` | Demo login path in `demo_role_router` (keep `false` for real demos) |
 
 ---
 
-## Flutter app
+## Flask API (AI Integration)
 
-```bash
-flutter pub get
-flutter analyze
-flutter run
-```
-
-**Web / Chrome:**
-
-```bash
-flutter run -d chrome --dart-define=MAPBOX_TOKEN=pk... --dart-define=FLASK_URL=http://localhost:5000
-```
-
-### Main entry
-
-- `lib/main.dart` — Supabase init, `ComplaintStore`, escalation timer.
-
-### Key packages
-
-See `pubspec.yaml`: `supabase_flutter`, `flutter_map`, `latlong2`, `geolocator`, `image_picker`, `http`, etc.
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health and key presence |
+| `/detect-flutter` | POST | Multipart `images`, optional lat/lng → severity, EPDO, detections, recommendations |
+| `/check-duplicate` | POST | JSON body: coordinates + nearby complaint list → duplicate suggestion |
+| `/verify-repair` | POST | Before/after images → SSIM and verdict |
 
 ---
 
-## Flask AI backend
+## Documentation
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/health` | GET | Liveness + key flags |
-| `/detect-flutter` | POST | Multipart images + lat/lng → JSON severity, EPDO, detections |
-| `/check-duplicate` | POST | JSON: nearby complaints vs radius (Haversine) |
-| `/verify-repair` | POST | Before/after images → SSIM, verdict |
-
----
-
-## Real device vs emulator (Flask URL)
-
-| Target | Typical `FLASK_URL` |
-|--------|---------------------|
-| Android emulator | `http://10.0.2.2:5000` (default in code) |
-| iOS simulator / desktop | `http://127.0.0.1:5000` or `http://localhost:5000` |
-| Physical phone (same Wi‑Fi as PC) | `http://<YOUR_PC_LAN_IP>:5000` |
-
-Ensure Windows Firewall allows inbound **TCP 5000** on private networks if the phone cannot reach the PC.
+| Document | Contents |
+|----------|----------|
+| [`CLAUDE.md`](CLAUDE.md) | Maintainer-oriented architecture and command cheat sheet |
+| [`docs/DEMO_WORKFLOWS.md`](docs/DEMO_WORKFLOWS.md) | Step-by-step demo scripts for judges or reviewers |
+| [`docs/FINAL_SUBMISSION_SAMVED_2026.md`](docs/FINAL_SUBMISSION_SAMVED_2026.md) | Problem alignment, subsystem checklist, scope notes (academic / SAMVED-style) |
 
 ---
 
-## Compile-time flags (`--dart-define`)
+## Demo and review checklist
 
-| Flag | Default | Meaning |
-|------|---------|---------|
-| `MAPBOX_TOKEN` | empty | Mapbox tiles; empty may fall back to OSM depending on config |
-| `FLASK_URL` | `http://10.0.2.2:5000` | AI backend base URL |
-| `ALLOW_MOCK_DATA` | `false` | Local mock complaints / seeder when `true` |
-| `ALLOW_DEMO_LOGIN` | `false` | Demo password path in `demo_role_router` (dev only) |
-
-Example production-style run:
-
-```bash
-flutter run --dart-define=ALLOW_MOCK_DATA=false --dart-define=ALLOW_DEMO_LOGIN=false --dart-define=MAPBOX_TOKEN=pk... --dart-define=FLASK_URL=http://192.168.1.10:5000
-```
-
----
-
-## Demo & judging
-
-- Use **`ALLOW_MOCK_DATA=false`** and **`ALLOW_DEMO_LOGIN=false`** so judges see real Supabase data and auth.
-- Run Flask with valid **Roboflow** + **Mapbox** keys; submit a **real** complaint and confirm **`ai_source`** / `severity_score` in Supabase when using live AI.
-- Optional: VS Code **Run and Debug** → configurations in `.vscode/launch.json` if present.
+- Set `ALLOW_MOCK_DATA=false` and `ALLOW_DEMO_LOGIN=false` for a realistic Supabase-backed demo.
+- Run Flask with valid **Roboflow** (and ideally **Mapbox**) keys; confirm new complaints show `ai_source`, `severity_score`, `epdo_score` in the database when the AI path succeeds.
+- Follow **`docs/DEMO_WORKFLOWS.md`** for role-by-role flows.
 
 ---
 
 ## Troubleshooting
 
-| Issue | What to check |
-|-------|----------------|
-| Map blank / no tiles | `MAPBOX_TOKEN` set; `flutter run` shows defines |
-| AI always “offline” / fallback | Phone `FLASK_URL` = PC LAN IP; Flask `host=0.0.0.0`; firewall; `/health` from phone browser |
-| `ROBOFLOW_API_KEY not set` | `.env` in **project root** (parent of `AI Integration`), restart Flask |
-| Supabase errors on insert | Run `migrate.sql`; RLS policies; `auth` session |
-| Analyzer noise | `flutter analyze` — fix **error** first; warnings/info are often style/deprecations |
+| Symptom | What to verify |
+|---------|----------------|
+| Blank map | `MAPBOX_TOKEN` passed to `flutter run`; check console for missing defines |
+| AI always falls back | `FLASK_URL` reachable from device (LAN IP, not `localhost`, on a real phone); Flask bound to `0.0.0.0`; firewall |
+| Flask refuses to start | `ROBOFLOW_API_KEY` in **repo root** `.env`; restart after edits |
+| Supabase insert / RLS errors | `migrate.sql` applied; user logged in; policies match your schema |
+| `ModuleNotFoundError: flask` | Use a venv and `pip install -r requirements.txt`, or `uv` as in Quick start |
 
 ---
 
 ## Contributing
 
-1. Branch from `main` (or your default branch).
-2. Run `flutter analyze` before PRs.
-3. Never commit `.env` or keystores.
+1. Branch from `main`.
+2. Run `flutter analyze` before opening a PR.
+3. Do not commit `.env`, API keys, or keystores.
 
 ---
 
-## License
+## License and acknowledgments
 
-This project is developed for **Solapur Municipal Corporation** / hackathon use. Add a SPDX license file if you release publicly.
+Developed for **Solapur Municipal Corporation** / academic and demonstration use. Add an explicit SPDX license file if you publish broadly.
+
+**Stack credits:** Flutter, Supabase, Mapbox, Roboflow, and the open-source packages listed in `pubspec.yaml` and `AI Integration/requirements.txt`.
 
 ---
 
-## Acknowledgments
+## Maintainer note
 
-- **Supabase** — PostgreSQL, Auth, Storage  
-- **Mapbox** — Maps and geocoding  
-- **Roboflow** — Pothole detection model  
-
-For internal developer notes, see **`CLAUDE.md`**.
+For file-level relationships (escalation timer, AI pipeline, dashboard adapters), keep **`CLAUDE.md`** alongside this README.
