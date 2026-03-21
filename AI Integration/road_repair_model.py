@@ -18,6 +18,10 @@ import os
 from typing import Dict, List, Optional, Union
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment from project root so API keys are not hardcoded
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 
 class RoadRepairRecommender:
@@ -28,7 +32,7 @@ class RoadRepairRecommender:
     
     def __init__(
         self,
-        roboflow_api_key: str = "agSdnMe5WdEBWCoBxS8V",
+        roboflow_api_key: str = os.getenv('ROBOFLOW_API_KEY', ''),
         mapbox_api_key: str = os.getenv("MAPBOX_ACCESS_TOKEN", ""),
         roboflow_model_id: str = "pothole-detection-gv5e7/3"
     ):

@@ -278,7 +278,7 @@ class ComplaintStore extends ChangeNotifier {
     final currentJe = _complaints.where((complaint) {
       final handler = (complaint['currentHandler'] ?? '').toString();
       if (handler != _kJE) return false;
-      final ward = (complaint['ward'] ?? '').toString();
+      final ward = (complaint['wardZone'] ?? '').toString();
       return _kJePrimaryWards.any((w) => ward.contains(w) || w.contains(ward));
     }).toList();
     final hasJeAssigned = currentJe.any((complaint) {
@@ -297,8 +297,8 @@ class ComplaintStore extends ChangeNotifier {
           workGang.isNotEmpty;
       final isVerifiedStage =
           status == 'verified' ||
-          status == 'in progress' ||
-          status == 'pending ce authorization' ||
+          status == 'inprogress' ||
+          status == 'pendingceapproval' ||
           status == 'resolved';
       return isAssigned && isVerifiedStage;
     });
@@ -313,7 +313,7 @@ class ComplaintStore extends ChangeNotifier {
     ) {
       final handler = (complaint['currentHandler'] ?? '').toString();
       if (handler != _kJE) return false;
-      final ward = (complaint['ward'] ?? '').toString();
+      final ward = (complaint['wardZone'] ?? '').toString();
       if (!_kJePrimaryWards.any((w) => ward.contains(w) || w.contains(ward)))
         return false;
       if (currentJe.isEmpty) return true;
@@ -333,8 +333,8 @@ class ComplaintStore extends ChangeNotifier {
           workGang.isNotEmpty;
       final isVerifiedStage =
           status == 'verified' ||
-          status == 'in progress' ||
-          status == 'pending ce authorization' ||
+          status == 'inprogress' ||
+          status == 'pendingceapproval' ||
           status == 'resolved';
       return isAssigned && isVerifiedStage;
     });
@@ -393,10 +393,10 @@ class ComplaintStore extends ChangeNotifier {
 
   List<String> _verificationRemarksForStatus(String status) {
     switch (status) {
-      case 'Pending CE Authorization':
+      case 'PendingCEApproval':
         return ['Field Verified', 'Pending Authorization'];
-      case 'In Progress':
-        return ['Engineer Confirmed', 'Work in Progress'];
+      case 'InProgress':
+        return ['Engineer Confirmed', 'Work InProgress'];
       case 'Resolved':
         return ['Field Verified', 'Work Completed'];
       case 'Escalated':
@@ -417,10 +417,10 @@ class ComplaintStore extends ChangeNotifier {
     final submitted = complaint['submittedDate'] as DateTime?;
     final verified = complaint['verifiedDate'] as DateTime?;
     final lastUpdate = complaint['lastUpdate'] as DateTime? ?? submitted;
-    final status = complaint['status'] as String? ?? 'New';
+    final status = complaint['status'] as String? ?? 'Open';
     final resolved = status == 'Resolved';
-    final inProgress = status == 'In Progress';
-    final pendingAuth = status == 'Pending CE Authorization';
+    final inProgress = status == 'InProgress';
+    final pendingAuth = status == 'PendingCEApproval';
     final escalated = status == 'Escalated';
 
     return [
@@ -440,13 +440,13 @@ class ComplaintStore extends ChangeNotifier {
         'date': verified != null ? _formatTimelineDate(verified) : null,
       },
       {
-        'stage': pendingAuth ? 'Pending CE Authorization' : 'Pending Approval',
+        'stage': pendingAuth ? 'PendingCEApproval' : 'Pending Approval',
         'completed': pendingAuth || inProgress || resolved,
         'current': pendingAuth,
         'date': pendingAuth ? _formatTimelineDate(lastUpdate) : null,
       },
       {
-        'stage': escalated ? 'Escalated' : 'In Progress',
+        'stage': escalated ? 'Escalated' : 'InProgress',
         'completed': inProgress || resolved || escalated,
         'current': inProgress || escalated,
         'date': (inProgress || resolved || escalated)
@@ -474,7 +474,7 @@ class ComplaintStore extends ChangeNotifier {
     final decorated = Map<String, dynamic>.from(complaint);
     final submittedDate = decorated['submittedDate'] as DateTime?;
     final lastUpdate = decorated['lastUpdate'] as DateTime? ?? submittedDate;
-    final status = (decorated['status'] ?? 'New').toString();
+    final status = (decorated['status'] ?? 'Open').toString();
 
     decorated['images'] = ((decorated['images'] as List?) ?? const [])
         .cast<String>();
@@ -677,7 +677,7 @@ class ComplaintStore extends ChangeNotifier {
   List<Map<String, dynamic>> getComplaintsForJE(List<String> assignedWards) {
     return _complaints.where((complaint) {
       if (complaint['currentHandler'] != _kJE) return false;
-      final ward = complaint['ward'] as String?;
+      final ward = complaint['wardZone'] as String?;
       if (ward == null || ward.trim().isEmpty) return true;
       final normalized = ward.toLowerCase();
       if (normalized.contains('pending') || normalized.contains('unknown'))
@@ -689,7 +689,7 @@ class ComplaintStore extends ChangeNotifier {
   List<Map<String, dynamic>> getComplaintsForAE(List<String> assignedWards) {
     return _complaints.where((complaint) {
       if (complaint['currentHandler'] != _kAE) return false;
-      final ward = complaint['ward'] as String?;
+      final ward = complaint['wardZone'] as String?;
       return ward != null &&
           assignedWards.any((w) => ward.contains(w) || w.contains(ward));
     }).toList();
@@ -698,7 +698,7 @@ class ComplaintStore extends ChangeNotifier {
   List<Map<String, dynamic>> getComplaintsForDE(List<String> assignedWards) {
     return _complaints.where((complaint) {
       if (complaint['currentHandler'] != _kDE) return false;
-      final ward = complaint['ward'] as String?;
+      final ward = complaint['wardZone'] as String?;
       return ward != null &&
           assignedWards.any((w) => ward.contains(w) || w.contains(ward));
     }).toList();
@@ -746,7 +746,7 @@ class ComplaintStore extends ChangeNotifier {
   ) {
     return _complaints.where((complaint) {
       if (complaint['escalatedFrom'] != _kJE) return false;
-      final ward = complaint['ward'] as String?;
+      final ward = complaint['wardZone'] as String?;
       return ward != null &&
           assignedWards.any((w) => ward.contains(w) || w.contains(ward));
     }).toList();
@@ -759,7 +759,7 @@ class ComplaintStore extends ChangeNotifier {
       if (complaint['currentHandler'] != _kAE ||
           complaint['escalatedFrom'] != _kJE)
         return false;
-      final ward = complaint['ward'] as String?;
+      final ward = complaint['wardZone'] as String?;
       return ward != null &&
           assignedWards.any((w) => ward.contains(w) || w.contains(ward));
     }).toList();
@@ -772,7 +772,7 @@ class ComplaintStore extends ChangeNotifier {
       if (complaint['currentHandler'] != _kDE ||
           complaint['escalatedFrom'] != _kAE)
         return false;
-      final ward = complaint['ward'] as String?;
+      final ward = complaint['wardZone'] as String?;
       return ward != null &&
           assignedWards.any((w) => ward.contains(w) || w.contains(ward));
     }).toList();
@@ -795,7 +795,7 @@ class ComplaintStore extends ChangeNotifier {
       if (complaint['currentHandler'] != _kDE ||
           complaint['escalatedFrom'] != _kAE)
         return false;
-      final ward = complaint['ward'] as String?;
+      final ward = complaint['wardZone'] as String?;
       return ward != null &&
           assignedWards.any((w) => ward.contains(w) || w.contains(ward));
     }).toList();
@@ -813,12 +813,12 @@ class ComplaintStore extends ChangeNotifier {
 
   List<Map<String, dynamic>> getComplaintsPendingCEAuthorization() {
     return _complaints
-        .where((complaint) => complaint['status'] == 'Pending CE Authorization')
+        .where((complaint) => complaint['status'] == 'PendingCEApproval')
         .toList();
   }
 
   List<Map<String, dynamic>> getContractorComplaints() {
-    const allowedStatuses = {'verified', 'in progress', 'resolved'};
+    const allowedStatuses = {'verified', 'inprogress', 'resolved'};
     return _complaints.where((complaint) {
       if (complaint['assignedPartyType'] != 'Contractor') return false;
       final assignedTo = (complaint['assignedTo'] ?? '').toString().trim();
@@ -832,7 +832,7 @@ class ComplaintStore extends ChangeNotifier {
   }
 
   List<Map<String, dynamic>> getWorkGangComplaints() {
-    const allowedStatuses = {'verified', 'in progress', 'resolved'};
+    const allowedStatuses = {'verified', 'inprogress', 'resolved'};
     return _complaints.where((complaint) {
       if (complaint['assignedPartyType'] != 'Work Gang') return false;
       final assignedTo = (complaint['assignedTo'] ?? '').toString().trim();
@@ -869,6 +869,7 @@ class ComplaintStore extends ChangeNotifier {
       'damageType': damageType,
       'location': location,
       'ward': ward,
+      'wardZone': ward,
       'coords': coords,
       'severity': severityScore != null
           ? severityScore.toStringAsFixed(1)
@@ -877,7 +878,7 @@ class ComplaintStore extends ChangeNotifier {
       if (priorityScore != null) 'priorityScore': priorityScore,
       if (epdoScore != null) 'epdoScore': epdoScore,
       if (totalPotholes != null) 'totalPotholes': totalPotholes,
-      'status': 'New',
+      'status': 'Open',
       'submittedDate': DateTime.now(),
       'lastUpdate': DateTime.now(),
       'images': images,
@@ -955,6 +956,7 @@ class ComplaintStore extends ChangeNotifier {
       'damageType': damageType,
       'location': location,
       'ward': ward,
+      'wardZone': ward,
       'coords': coords,
       'severity': severityScore != null
           ? severityScore.toStringAsFixed(1)
@@ -963,7 +965,7 @@ class ComplaintStore extends ChangeNotifier {
       if (severityScore != null) 'severityScore': severityScore,
       if (epdoScore != null) 'epdoScore': epdoScore,
       if (totalPotholes != null) 'totalPotholes': totalPotholes,
-      'status': 'New',
+      'status': 'Open',
       'submittedDate': DateTime.now(),
       'lastUpdate': DateTime.now(),
       'images': images,
@@ -1173,7 +1175,7 @@ class ComplaintStore extends ChangeNotifier {
     final complaint = getComplaintById(complaintId);
     if (complaint == null) return;
     final currentHandler = complaint['currentHandler'] as String? ?? _kJE;
-    await ComplaintService.instance.submitForCeAuthorization(
+      await ComplaintService.instance.submitForCeAuthorization(
       complaintId: complaintId,
       existingComplaint: complaint,
       verificationData: verificationData,
@@ -1181,7 +1183,7 @@ class ComplaintStore extends ChangeNotifier {
     complaint
       ..addAll(verificationData)
       ..addAll({
-        'status': verificationData['status'] ?? 'Pending CE Authorization',
+        'status': verificationData['status'] ?? 'PendingCEApproval',
         'currentHandler': _kCE,
         'receivedAtCurrentLevel': DateTime.now(),
         'escalatedFrom': currentHandler,

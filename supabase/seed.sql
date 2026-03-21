@@ -44,14 +44,14 @@ ON CONFLICT (email) DO NOTHING;
 INSERT INTO complaints (
   id, title, description, damage_type, severity, status,
   priority_score, epdo_score,
-  lat, lng, location, ward,
+  latitude, longitude, location, ward_zone,
   assigned_to, assigned_party_type, work_gang, official_remarks,
   images, current_handler, reported_by, upvotes,
-  submitted_date, verified_date, last_update,
+  created_at, verified_date, last_update,
   received_at_current_level, total_potholes
 ) VALUES
 -- ═══ Ward: North (8 complaints) ═══
-('c001', 'Deep pothole on Akkalkot Road', 'Large pothole near MSRTC bus stand causing traffic jam', 'Pothole', 'Critical', 'In Progress',
+('c001', 'Deep pothole on Akkalkot Road', 'Large pothole near MSRTC bus stand causing traffic jam', 'Pothole', 'Critical', 'InProgress',
  8.5, 8.2, 17.6945, 75.9120, 'Akkalkot Road, near MSRTC Bus Stand', 'North',
  'contractor1@smcsolapur.gov.in', 'Contractor', 'Gang A', 'Assigned to contractor, work started',
  ARRAY['https://placehold.co/400x300?text=Pothole+c001'], 'JE', 'citizen', 24,
@@ -72,14 +72,14 @@ INSERT INTO complaints (
  now() - interval '15 days', now() - interval '13 days', now() - interval '5 days',
  now() - interval '13 days', 1),
 
-('c004', 'Edge erosion on NH-65', 'Road edge crumbling near Solapur toll plaza', 'Edge Break', 'Critical', 'In Progress',
+('c004', 'Edge erosion on NH-65', 'Road edge crumbling near Solapur toll plaza', 'Edge Break', 'Critical', 'InProgress',
  9.0, 9.1, 17.7200, 75.8870, 'NH-65 near Solapur Toll Plaza', 'North',
  'contractor1@smcsolapur.gov.in', 'Contractor', 'Gang B', 'Priority repair underway',
  ARRAY['https://placehold.co/400x300?text=Edge+c004'], 'AE', 'citizen', 32,
  now() - interval '20 days', now() - interval '18 days', now() - interval '3 days',
  now() - interval '7 days', 5),
 
-('c005', 'Pothole cluster near Vijapur Road bus stop', 'Three potholes in 20m stretch', 'Pothole', 'Medium', 'New',
+('c005', 'Pothole cluster near Vijapur Road bus stop', 'Three potholes in 20m stretch', 'Pothole', 'Medium', 'Open',
  5.2, 4.8, 17.6990, 75.9310, 'Vijapur Road, near Ambedkar Chowk', 'North',
  NULL, NULL, NULL, NULL,
  ARRAY['https://placehold.co/400x300?text=Pothole+c005'], 'JE', 'citizen', 6,
@@ -100,7 +100,7 @@ INSERT INTO complaints (
  now() - interval '30 days', now() - interval '28 days', now() - interval '10 days',
  now() - interval '28 days', 0),
 
-('c008', 'Road cave-in near Ekrukh Road', 'Partial cave-in due to drainage pipe burst', 'Cave-in', 'Critical', 'In Progress',
+('c008', 'Road cave-in near Ekrukh Road', 'Partial cave-in due to drainage pipe burst', 'Cave-in', 'Critical', 'InProgress',
  9.5, 9.3, 17.7150, 75.9150, 'Ekrukh Road, near Water Tank', 'North',
  'contractor1@smcsolapur.gov.in', 'Contractor', 'Gang C', 'Emergency repair',
  ARRAY['https://placehold.co/400x300?text=CaveIn+c008'], 'AE', 'citizen', 41,
@@ -108,14 +108,14 @@ INSERT INTO complaints (
  now() - interval '2 days', 2),
 
 -- ═══ Ward: South (9 complaints) ═══
-('c009', 'Pothole on Pune-Solapur Highway', 'Large pothole on main highway causing accidents', 'Pothole', 'Critical', 'In Progress',
+('c009', 'Pothole on Pune-Solapur Highway', 'Large pothole on main highway causing accidents', 'Pothole', 'Critical', 'InProgress',
  9.2, 9.0, 17.6650, 75.8950, 'Pune-Solapur Highway, Km 298', 'South',
  'contractor2@smcsolapur.gov.in', 'Contractor', 'Gang D', 'Urgent repair',
  ARRAY['https://placehold.co/400x300?text=Pothole+c009'], 'JE', 'citizen', 35,
  now() - interval '7 days', now() - interval '5 days', now() - interval '1 day',
  now() - interval '5 days', 4),
 
-('c010', 'Cracked pavement at Siddheshwar Temple Road', 'Pavement cracked along pilgrim route', 'Crack', 'Medium', 'New',
+('c010', 'Cracked pavement at Siddheshwar Temple Road', 'Pavement cracked along pilgrim route', 'Crack', 'Medium', 'Open',
  4.8, 5.2, 17.6780, 75.9000, 'Siddheshwar Temple Approach Road', 'South',
  NULL, NULL, NULL, NULL,
  ARRAY['https://placehold.co/400x300?text=Crack+c010'], 'JE', 'citizen', 8,
@@ -136,7 +136,7 @@ INSERT INTO complaints (
  now() - interval '10 days', now() - interval '8 days', now() - interval '3 days',
  now() - interval '8 days', 0),
 
-('c013', 'Sinkhole forming near Solapur Fort', 'Small sinkhole appearing near historic fort', 'Sinkhole', 'Critical', 'In Progress',
+('c013', 'Sinkhole forming near Solapur Fort', 'Small sinkhole appearing near historic fort', 'Sinkhole', 'Critical', 'InProgress',
  8.7, 8.9, 17.6700, 75.9060, 'Near Solapur Fort, Bhavani Peth', 'South',
  'contractor2@smcsolapur.gov.in', 'Contractor', 'Gang E', 'Heritage zone, careful repair needed',
  ARRAY['https://placehold.co/400x300?text=Sinkhole+c013'], 'DE', 'citizen', 22,
@@ -150,7 +150,7 @@ INSERT INTO complaints (
  now() - interval '6 days', now() - interval '5 days', now() - interval '2 days',
  now() - interval '5 days', 5),
 
-('c015', 'Road shoulder damage on Barshi Road', 'Shoulder eroded, dangerous for pedestrians', 'Edge Break', 'Medium', 'New',
+('c015', 'Road shoulder damage on Barshi Road', 'Shoulder eroded, dangerous for pedestrians', 'Edge Break', 'Medium', 'Open',
  5.0, 4.5, 17.6550, 75.9200, 'Barshi Road, KM 5', 'South',
  NULL, NULL, NULL, NULL,
  ARRAY['https://placehold.co/400x300?text=Shoulder+c015'], 'JE', 'citizen', 3,
@@ -164,7 +164,7 @@ INSERT INTO complaints (
  now() - interval '9 days', now() - interval '7 days', now() - interval '3 days',
  now() - interval '7 days', 0),
 
-('c017', 'Repaired road re-damaged by rain', 'Patch repair washed out after first rain', 'Pothole', 'High', 'New',
+('c017', 'Repaired road re-damaged by rain', 'Patch repair washed out after first rain', 'Pothole', 'High', 'Open',
  7.2, 6.5, 17.6600, 75.9050, 'Laxmi Peth, South Ward', 'South',
  NULL, NULL, NULL, NULL,
  ARRAY['https://placehold.co/400x300?text=Redamage+c017'], 'JE', 'citizen', 16,
@@ -172,7 +172,7 @@ INSERT INTO complaints (
  now() - interval '1 day', 2),
 
 -- ═══ Ward: East (8 complaints) ═══
-('c018', 'Pothole near Solapur Railway Station', 'Large pothole at station approach road', 'Pothole', 'Critical', 'In Progress',
+('c018', 'Pothole near Solapur Railway Station', 'Large pothole at station approach road', 'Pothole', 'Critical', 'InProgress',
  8.9, 8.7, 17.6868, 75.9200, 'Railway Station Road, East', 'East',
  'contractor1@smcsolapur.gov.in', 'Contractor', 'Gang F', 'High priority — station area',
  ARRAY['https://placehold.co/400x300?text=Pothole+c018'], 'JE', 'citizen', 30,
@@ -193,7 +193,7 @@ INSERT INTO complaints (
  now() - interval '16 days', now() - interval '14 days', now() - interval '5 days',
  now() - interval '14 days', 0),
 
-('c021', 'Road surface uplift at Kegaon', 'Tree roots causing road uplift', 'Surface Damage', 'Medium', 'New',
+('c021', 'Road surface uplift at Kegaon', 'Tree roots causing road uplift', 'Surface Damage', 'Medium', 'Open',
  4.5, 4.2, 17.6950, 75.9350, 'Kegaon Main Road', 'East',
  NULL, NULL, NULL, NULL,
  ARRAY['https://placehold.co/400x300?text=Uplift+c021'], 'JE', 'citizen', 5,
@@ -214,14 +214,14 @@ INSERT INTO complaints (
  now() - interval '45 days', now() - interval '40 days', now() - interval '15 days',
  now() - interval '40 days', 0),
 
-('c024', 'Collapsed drain at Budhwar Peth', 'Road collapsed around drain pipe', 'Cave-in', 'Critical', 'In Progress',
+('c024', 'Collapsed drain at Budhwar Peth', 'Road collapsed around drain pipe', 'Cave-in', 'Critical', 'InProgress',
  9.1, 9.4, 17.6900, 75.9150, 'Budhwar Peth, near SBI Bank', 'East',
  'contractor1@smcsolapur.gov.in', 'Contractor', 'Gang G', 'Emergency repair underway',
  ARRAY['https://placehold.co/400x300?text=Collapse+c024'], 'AE', 'citizen', 33,
  now() - interval '3 days', now() - interval '3 days', now() - interval '1 day',
  now() - interval '3 days', 2),
 
-('c025', 'Potholes on Mill Corner street', 'Small potholes appearing after pipe-laying work', 'Pothole', 'Medium', 'New',
+('c025', 'Potholes on Mill Corner street', 'Small potholes appearing after pipe-laying work', 'Pothole', 'Medium', 'Open',
  5.8, 5.5, 17.6840, 75.9310, 'Mill Corner, East Ward', 'East',
  NULL, NULL, NULL, NULL,
  ARRAY['https://placehold.co/400x300?text=Pothole+c025'], 'JE', 'citizen', 4,
@@ -229,15 +229,15 @@ INSERT INTO complaints (
  now() - interval '1 day', 2),
 
 -- ═══ Ward: West (9 complaints) ═══
-('c026', 'Large pothole on Tuljapur Road', 'Deep pothole filled with muddy water', 'Pothole', 'Critical', 'In Progress',
+('c026', 'Large pothole on Tuljapur Road', 'Deep pothole filled with muddy water', 'Pothole', 'Critical', 'InProgress',
  8.6, 8.3, 17.6868, 75.8850, 'Tuljapur Road, West Ward', 'West',
- 'contractor2@smcsolapur.gov.in', 'Contractor', 'Gang H', 'Repair in progress',
+ 'contractor2@smcsolapur.gov.in', 'Contractor', 'Gang H', 'Repair InProgress',
  ARRAY['https://placehold.co/400x300?text=Pothole+c026'], 'JE', 'citizen', 19,
  now() - interval '13 days', now() - interval '11 days', now() - interval '2 days',
  now() - interval '11 days', 3),
 
 ('c027', 'Road subsidence at Gulbarga Road', 'Road sinking near construction site', 'Subsidence', 'High', 'Assigned',
- 7.5, 7.8, 17.6800, 75.8780, 'Gulbarga Road, near new flyover', 'West',
+ 7.5, 7.8, 17.6800, 75.8780, 'Gulbarga Road, near Open flyover', 'West',
  'contractor2@smcsolapur.gov.in', 'Contractor', NULL, 'Construction-related damage',
  ARRAY['https://placehold.co/400x300?text=Subsidence+c027'], 'JE', 'citizen', 13,
  now() - interval '19 days', now() - interval '17 days', now() - interval '4 days',
@@ -250,14 +250,14 @@ INSERT INTO complaints (
  now() - interval '8 days', now() - interval '6 days', now() - interval '2 days',
  now() - interval '6 days', 0),
 
-('c029', 'Pothole near Saat Rasta', 'Pothole at major 7-road intersection', 'Pothole', 'Critical', 'In Progress',
+('c029', 'Pothole near Saat Rasta', 'Pothole at major 7-road intersection', 'Pothole', 'Critical', 'InProgress',
  9.3, 9.0, 17.6900, 75.8930, 'Saat Rasta Junction', 'West',
  'contractor2@smcsolapur.gov.in', 'Contractor', 'Gang I', 'Maximum priority',
  ARRAY['https://placehold.co/400x300?text=Pothole+c029'], 'DE', 'citizen', 38,
  now() - interval '22 days', now() - interval '20 days', now() - interval '1 day',
  now() - interval '5 days', 6),
 
-('c030', 'Gravel road deterioration at Bale', 'Gravel road completely washed out', 'Surface Damage', 'Medium', 'New',
+('c030', 'Gravel road deterioration at Bale', 'Gravel road completely washed out', 'Surface Damage', 'Medium', 'Open',
  4.0, 3.8, 17.6700, 75.8750, 'Bale Village Road, West outskirts', 'West',
  NULL, NULL, NULL, NULL,
  ARRAY['https://placehold.co/400x300?text=Gravel+c030'], 'JE', 'citizen', 2,
@@ -278,7 +278,7 @@ INSERT INTO complaints (
  now() - interval '12 days', now() - interval '10 days', now() - interval '3 days',
  now() - interval '10 days', 4),
 
-('c033', 'Flooded road at Pandharpur junction', 'Chronic flooding at junction', 'Waterlogging', 'High', 'In Progress',
+('c033', 'Flooded road at Pandharpur junction', 'Chronic flooding at junction', 'Waterlogging', 'High', 'InProgress',
  7.0, 7.6, 17.6780, 75.8820, 'Pandharpur Road Junction', 'West',
  'contractor2@smcsolapur.gov.in', 'Contractor', 'Gang J', 'Drainage improvement ongoing',
  ARRAY['https://placehold.co/400x300?text=Flood+c033'], 'JE', 'citizen', 15,
@@ -293,7 +293,7 @@ INSERT INTO complaints (
  now() - interval '33 days', 0),
 
 -- ═══ Ward: Central (8 complaints) ═══
-('c035', 'Pothole at Shivaji Chowk', 'Deep pothole at main city square', 'Pothole', 'Critical', 'In Progress',
+('c035', 'Pothole at Shivaji Chowk', 'Deep pothole at main city square', 'Pothole', 'Critical', 'InProgress',
  9.0, 8.8, 17.6868, 75.9074, 'Shivaji Chowk, Central Solapur', 'Central',
  'contractor1@smcsolapur.gov.in', 'Contractor', 'Gang K', 'City center repair priority',
  ARRAY['https://placehold.co/400x300?text=Pothole+c035'], 'JE', 'citizen', 40,
@@ -307,7 +307,7 @@ INSERT INTO complaints (
  now() - interval '9 days', now() - interval '7 days', now() - interval '3 days',
  now() - interval '7 days', 0),
 
-('c037', 'Road damaged by heavy vehicle', 'Cement truck damaged residential road', 'Surface Damage', 'Medium', 'New',
+('c037', 'Road damaged by heavy vehicle', 'Cement truck damaged residential road', 'Surface Damage', 'Medium', 'Open',
  5.4, 5.0, 17.6840, 75.9050, 'Mangal Park Area, Central', 'Central',
  NULL, NULL, NULL, NULL,
  ARRAY['https://placehold.co/400x300?text=HeavyVehicle+c037'], 'JE', 'citizen', 6,
@@ -328,7 +328,7 @@ INSERT INTO complaints (
  now() - interval '7 days', now() - interval '5 days', now() - interval '2 days',
  now() - interval '5 days', 0),
 
-('c040', 'Collapsed culvert on inner ring road', 'Culvert collapsed causing road dip', 'Cave-in', 'Critical', 'In Progress',
+('c040', 'Collapsed culvert on inner ring road', 'Culvert collapsed causing road dip', 'Cave-in', 'Critical', 'InProgress',
  9.2, 9.5, 17.6870, 75.9020, 'Inner Ring Road, Central', 'Central',
  'contractor1@smcsolapur.gov.in', 'Contractor', 'Gang L', 'Structural repair needed',
  ARRAY['https://placehold.co/400x300?text=Culvert+c040'], 'CE', 'citizen', 37,
@@ -342,7 +342,7 @@ INSERT INTO complaints (
  now() - interval '40 days', now() - interval '38 days', now() - interval '20 days',
  now() - interval '38 days', 0),
 
-('c042', 'Road marking faded on Main Street', 'Lane markings completely faded', 'Surface Damage', 'Low', 'New',
+('c042', 'Road marking faded on Main Street', 'Lane markings completely faded', 'Surface Damage', 'Low', 'Open',
  2.5, 2.0, 17.6875, 75.9060, 'Main Street, Central Solapur', 'Central',
  NULL, NULL, NULL, NULL,
  ARRAY['https://placehold.co/400x300?text=Marking+c042'], 'JE', 'citizen', 1,
@@ -357,14 +357,14 @@ INSERT INTO complaints (
  now() - interval '10 days', now() - interval '8 days', now() - interval '3 days',
  now() - interval '8 days', 2),
 
-('c044', 'Road crack near Solapur Airport', 'Long transverse crack on airport road', 'Crack', 'Medium', 'New',
+('c044', 'Road crack near Solapur Airport', 'Long transverse crack on airport road', 'Crack', 'Medium', 'Open',
  5.5, 5.8, 17.6600, 75.9330, 'Airport Road, Cantonment', 'Cantonment',
  NULL, NULL, NULL, NULL,
  ARRAY['https://placehold.co/400x300?text=Crack+c044'], 'JE', 'citizen', 5,
  now() - interval '4 days', NULL, now() - interval '4 days',
  now() - interval '4 days', 0),
 
-('c045', 'Waterlogging at Sadar Bazaar extension', 'Chronic waterlogging after every rain', 'Waterlogging', 'High', 'In Progress',
+('c045', 'Waterlogging at Sadar Bazaar extension', 'Chronic waterlogging after every rain', 'Waterlogging', 'High', 'InProgress',
  7.3, 7.7, 17.6720, 75.9300, 'Sadar Bazaar Extension, Cantonment', 'Cantonment',
  'contractor1@smcsolapur.gov.in', 'Contractor', NULL, 'Drainage improvement planned',
  ARRAY['https://placehold.co/400x300?text=Waterlog+c045'], 'JE', 'citizen', 16,
@@ -385,14 +385,14 @@ INSERT INTO complaints (
  now() - interval '6 days', now() - interval '4 days', now() - interval '2 days',
  now() - interval '4 days', 2),
 
-('c048', 'Road surface buckling at Borsline', 'Asphalt buckling in hot weather', 'Surface Damage', 'Medium', 'New',
+('c048', 'Road surface buckling at Borsline', 'Asphalt buckling in hot weather', 'Surface Damage', 'Medium', 'Open',
  4.8, 4.3, 17.6640, 75.9220, 'Borsline Area, Cantonment', 'Cantonment',
  NULL, NULL, NULL, NULL,
  ARRAY['https://placehold.co/400x300?text=Buckle+c048'], 'JE', 'citizen', 3,
  now() - interval '3 days', NULL, now() - interval '3 days',
  now() - interval '3 days', 0),
 
-('c049', 'Massive pothole on Yeshwant Nagar approach', 'Very deep pothole causing two-wheeler accidents', 'Pothole', 'Critical', 'In Progress',
+('c049', 'Massive pothole on Yeshwant Nagar approach', 'Very deep pothole causing two-wheeler accidents', 'Pothole', 'Critical', 'InProgress',
  9.1, 8.8, 17.6730, 75.9190, 'Yeshwant Nagar Approach Road', 'Cantonment',
  'contractor1@smcsolapur.gov.in', 'Contractor', 'Gang O', 'Multiple accident reports',
  ARRAY['https://placehold.co/400x300?text=Pothole+c049'], 'JE', 'citizen', 29,

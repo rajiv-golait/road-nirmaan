@@ -733,7 +733,8 @@ def verify_repair():
             after_img = cv2.resize(after_img, (before_img.shape[1], before_img.shape[0]))
 
         score, _ = ssim(before_img, after_img, full=True)
-        passed = score >= 0.80
+        # Inverse SSIM logic: surface must change after repair
+        passed = score < 0.75
         verification_hash = None
         if passed:
             hash_input = f"{complaint_id}:{round(float(score), 6)}:{datetime.utcnow().isoformat()}"

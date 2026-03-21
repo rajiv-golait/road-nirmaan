@@ -42,7 +42,10 @@ class FlaskAiService {
           try {
             // Local path mobile
             request.files.add(await http.MultipartFile.fromPath('images', img));
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('Failed to attach image: $e');
+            // Skip this image and continue with others
+          }
         }
       }
     }

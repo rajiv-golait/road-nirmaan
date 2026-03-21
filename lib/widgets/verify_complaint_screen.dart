@@ -225,7 +225,7 @@ class _VerifyComplaintScreenState extends State<VerifyComplaintScreen> {
             if (verificationResult?['verification_hash'] != null)
               'verificationHash': verificationResult?['verification_hash'],
             if (verdict != null) 'verificationStatus': verdict,
-            if (isRepairVerified) 'status': 'Resolved',
+            if (isRepairVerified) 'status': 'PendingCEApproval',
           });
 
       if (!mounted) return;

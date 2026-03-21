@@ -17,6 +17,16 @@ const Color surface = Color(0xFFE7E2D8);
 const Color textPrimary = Color(0xFF2B2B2B);
 const Color textSecondary = Color(0xFF6F6F6F);
 
+ImageProvider<Object> _complaintImageProvider(String path) {
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return NetworkImage(path);
+  }
+  if (path.startsWith('/') || path.contains(r':\')) {
+    return FileImage(File(path));
+  }
+  return AssetImage(path);
+}
+
 // Global Dummy Data
 final List<Map<String, dynamic>> allComplaints = [
   {
@@ -48,7 +58,7 @@ final List<Map<String, dynamic>> allComplaints = [
     'location': 'Hotgi Road, Solapur',
     'coords': LatLng(17.6550, 75.9150),
     'severity': 'Medium',
-    'status': 'In Progress',
+    'status': 'InProgress',
     'id': 'CMP202603',
     'date': '2026-01-26',
     'images': ['assets/images (6).jpg', 'assets/download (2).jpg'],
@@ -108,7 +118,7 @@ final List<Map<String, dynamic>> allComplaints = [
     'location': 'Old Pune Naka',
     'coords': LatLng(17.6780, 75.8980),
     'severity': 'High',
-    'status': 'In Progress',
+    'status': 'InProgress',
     'id': 'CMP202609',
     'date': '2026-01-20',
     'images': ['assets/images (6).jpg', 'assets/images (2).jpg'],
@@ -330,7 +340,7 @@ class _HomeViewState extends State<_HomeView> {
             const SizedBox(width: 12),
             _StatCard(
               icon: Icons.construction_outlined,
-              label: 'Work in Progress',
+              label: 'Work InProgress',
               value: '12',
               color: const Color(0xFF7D622A), // Darker authoritative amber
               bgColor: const Color(0xFFEBDDBE), // Stronger muted sand
@@ -338,8 +348,8 @@ class _HomeViewState extends State<_HomeView> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => _ComplaintListView(
-                    title: 'Work in Progress',
-                    filterStatus: 'In Progress',
+                    title: 'Work InProgress',
+                    filterStatus: 'InProgress',
                     onLocationClick: widget.onLocationClick,
                   ),
                 ),
@@ -441,7 +451,7 @@ class _TrackView extends StatelessWidget {
       'title': 'Pothole on MG Road',
       'location': 'MG Road, Near Central Mall, Solapur',
       'coords': LatLng(17.6715, 75.9101),
-      'status': 'In Progress',
+      'status': 'InProgress',
       'submittedDate': '29 Jan 2026, 10:42 AM',
       'lastUpdated': '2 days ago',
       'isMine': true,
@@ -471,7 +481,7 @@ class _TrackView extends StatelessWidget {
           'date': '30 Jan 2026, 11:00 AM',
         },
         {
-          'stage': 'In Progress',
+          'stage': 'InProgress',
           'completed': false,
           'current': true,
           'date': '31 Jan 2026, 5:10 PM',
@@ -506,7 +516,7 @@ class _TrackView extends StatelessWidget {
           'date': '28 Jan 2026, 5:00 PM',
         },
         {'stage': 'Pending Approval', 'completed': false, 'date': null},
-        {'stage': 'In Progress', 'completed': false, 'date': null},
+        {'stage': 'InProgress', 'completed': false, 'date': null},
         {'stage': 'Resolved', 'completed': false, 'date': null},
       ],
     },
@@ -546,7 +556,7 @@ class _TrackView extends StatelessWidget {
           'current': true,
           'date': '28 Jan 2026, 10:00 AM',
         },
-        {'stage': 'In Progress', 'completed': false, 'date': null},
+        {'stage': 'InProgress', 'completed': false, 'date': null},
         {'stage': 'Resolved', 'completed': false, 'date': null},
       ],
     },
@@ -582,7 +592,7 @@ class _TrackView extends StatelessWidget {
           'date': '21 Jan 2026, 9:00 AM',
         },
         {
-          'stage': 'In Progress',
+          'stage': 'InProgress',
           'completed': true,
           'date': '22 Jan 2026, 8:30 AM',
         },
@@ -598,13 +608,13 @@ class _TrackView extends StatelessWidget {
       'title': 'Surface damage on highway',
       'location': 'Pune-Solapur Highway, KM 245',
       'coords': LatLng(17.6800, 75.9200),
-      'status': 'In Progress',
+      'status': 'InProgress',
       'submittedDate': '26 Jan 2026, 11:30 AM',
       'lastUpdated': '5 days ago',
       'isMine': false,
       'upvotes': 18,
       'hasUpvoted': false,
-      'verificationRemarks': ['Engineer Confirmed', 'Work in Progress'],
+      'verificationRemarks': ['Engineer Confirmed', 'Work InProgress'],
       'officialRemarks': 'Repair crew deployed. Expected completion in 3 days.',
       'images': [
         'assets/download (2).jpg',
@@ -629,7 +639,7 @@ class _TrackView extends StatelessWidget {
           'date': '27 Jan 2026, 10:00 AM',
         },
         {
-          'stage': 'In Progress',
+          'stage': 'InProgress',
           'completed': false,
           'current': true,
           'date': '28 Jan 2026, 9:00 AM',
@@ -705,7 +715,7 @@ class _ComplaintTrackCard extends StatelessWidget {
         return Colors.orange;
       case 'Pending':
         return const Color(0xFFCBB17D);
-      case 'In Progress':
+      case 'InProgress':
         return const Color(0xFF4A90D9);
       case 'Resolved':
         return const Color(0xFF7DB89A);
@@ -938,7 +948,7 @@ class _ComplaintDetailScreenState extends State<_ComplaintDetailScreen> {
         return Colors.orange;
       case 'Pending':
         return const Color(0xFFCBB17D);
-      case 'In Progress':
+      case 'InProgress':
         return const Color(0xFF4A90D9);
       case 'Resolved':
         return const Color(0xFF7DB89A);
@@ -1576,7 +1586,7 @@ class _MapViewState extends State<_MapView> {
       'id': 'CMP202601',
       'title': 'Pothole on MG Road',
       'location': LatLng(17.6715, 75.9101),
-      'status': 'In Progress',
+      'status': 'InProgress',
       'color': Colors.blue,
       'isMine': false,
       'address': 'MG Road, Solapur Central',
@@ -1606,7 +1616,7 @@ class _MapViewState extends State<_MapView> {
           'date': '28 Jan 2026, 11:30 AM',
         },
         {
-          'stage': 'In Progress',
+          'stage': 'InProgress',
           'completed': false,
           'current': true,
           'date': 'Started 29 Jan',
@@ -1672,7 +1682,7 @@ class _MapViewState extends State<_MapView> {
           'date': '21 Jan 2026, 09:00 AM',
         },
         {
-          'stage': 'In Progress',
+          'stage': 'InProgress',
           'completed': true,
           'date': '23 Jan 2026, 10:00 AM',
         },
@@ -1752,7 +1762,7 @@ class _MapViewState extends State<_MapView> {
       'id': 'CMP202606',
       'title': 'Road marking faded',
       'location': LatLng(17.6800, 75.9200),
-      'status': 'In Progress',
+      'status': 'InProgress',
       'color': Colors.blue,
       'isMine': false,
       'address': 'Vikas Nagar, Solapur',
@@ -1778,7 +1788,7 @@ class _MapViewState extends State<_MapView> {
           'date': '26 Jan 2026, 09:30 AM',
         },
         {
-          'stage': 'In Progress',
+          'stage': 'InProgress',
           'completed': false,
           'current': true,
           'date': 'Painting Scheduled',
@@ -1826,7 +1836,7 @@ class _MapViewState extends State<_MapView> {
       'title': 'Surface damage on highway',
       'location': LatLng(17.6800, 75.9200),
       'coords': LatLng(17.6800, 75.9200),
-      'status': 'In Progress',
+      'status': 'InProgress',
       'color': Colors.blue,
       'isMine': false,
       'address': 'Pune-Solapur Highway, KM 245',
@@ -1834,7 +1844,7 @@ class _MapViewState extends State<_MapView> {
       'lastUpdated': '5 days ago',
       'upvotes': 18,
       'hasUpvoted': false,
-      'verificationRemarks': ['Engineer Confirmed', 'Work in Progress'],
+      'verificationRemarks': ['Engineer Confirmed', 'Work InProgress'],
       'officialRemarks': 'Repair crew deployed. Expected completion in 3 days.',
       'images': [
         'assets/download (2).jpg',
@@ -1859,7 +1869,7 @@ class _MapViewState extends State<_MapView> {
           'date': '27 Jan 2026, 10:00 AM',
         },
         {
-          'stage': 'In Progress',
+          'stage': 'InProgress',
           'completed': false,
           'current': true,
           'date': '28 Jan 2026, 9:00 AM',
@@ -2003,7 +2013,7 @@ class _MapViewState extends State<_MapView> {
   Widget _statusBadge(String status) {
     Color color;
     switch (status) {
-      case 'In Progress':
+      case 'InProgress':
         color = const Color(0xFF4A90D9);
         break;
       case 'Pending':
@@ -2131,7 +2141,7 @@ class _MapViewState extends State<_MapView> {
                 children: [
                   _legendItem('Resolved', Colors.green),
                   const SizedBox(width: 12),
-                  _legendItem('In Progress', Colors.blue),
+                  _legendItem('InProgress', Colors.blue),
                   const SizedBox(width: 12),
                   _legendItem('Pending Approval', Colors.orange),
                   const SizedBox(width: 12),
@@ -2211,7 +2221,7 @@ class _ActivityViewState extends State<_ActivityView> {
       },
       'details': {
         'full_content':
-            'Municipal Corporation has initiated pothole repair work on Hotgi Road following multiple citizen complaints. The repair crew has been deployed and work is currently in progress.\n\nWork Details:\n- Location: Hotgi Road, near Siddheshwar Temple\n- Expected completion: 2 days\n- Work timings: 8 AM - 6 PM\n\nMinor traffic delays are expected during work hours. Motorists are requested to exercise caution.',
+            'Municipal Corporation has initiated pothole repair work on Hotgi Road following multiple citizen complaints. The repair crew has been deployed and work is currently InProgress.\n\nWork Details:\n- Location: Hotgi Road, near Siddheshwar Temple\n- Expected completion: 2 days\n- Work timings: 8 AM - 6 PM\n\nMinor traffic delays are expected during work hours. Motorists are requested to exercise caution.',
         'location': 'Hotgi Road, near Siddheshwar Temple',
         'estimated_completion': '2 days',
       },
@@ -3847,7 +3857,7 @@ class _TotalComplaintsOverviewState extends State<_TotalComplaintsOverview> {
                     ),
                     const SizedBox(height: 8),
                     _statusStatRow(
-                      'Work in Progress',
+                      'Work InProgress',
                       workInProgress,
                       totalComplaints,
                       const Color(0xFFCBB17D),
@@ -3913,7 +3923,7 @@ class _TotalComplaintsOverviewState extends State<_TotalComplaintsOverview> {
                         ),
                         _buildLegendItem('Resolved', const Color(0xFF7DB89A)),
                         _buildLegendItem(
-                          'Work in Progress',
+                          'Work InProgress',
                           const Color(0xFFCBB17D),
                         ),
                         _buildLegendItem(
@@ -4205,7 +4215,7 @@ class _TotalComplaintsOverviewState extends State<_TotalComplaintsOverview> {
                               const Color(0xFF7DB89A),
                               false,
                             ),
-                            // Work in Progress
+                            // Work InProgress
                             _buildLineBarData(
                               2,
                               const [
@@ -4472,7 +4482,7 @@ class _TotalComplaintsOverviewState extends State<_TotalComplaintsOverview> {
     const curveNames = [
       'Total Complaints',
       'Resolved',
-      'Work in Progress',
+      'Work InProgress',
       'Pending/Paperwork',
     ];
 
@@ -5045,7 +5055,7 @@ class _ResolutionRateDetailViewState extends State<_ResolutionRateDetailView> {
                   const SizedBox(height: 16),
                   _calcRow('Total Complaints Reported', '45'),
                   _calcRow('Successfully Resolved', '32'),
-                  _calcRow('Work Currently in Progress', '12'),
+                  _calcRow('Work Currently InProgress', '12'),
                   _calcRow('Pending Initial Review', '1'),
                 ],
               ),
@@ -5119,7 +5129,7 @@ class _ResolutionRateDetailViewState extends State<_ResolutionRateDetailView> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _legendItem('Resolved', const Color(0xFF7DB89A)),
-                      _legendItem('In Progress', const Color(0xFFCBB17D)),
+                      _legendItem('InProgress', const Color(0xFFCBB17D)),
                       _legendItem('Pending', const Color(0xFFD4B97E)),
                     ],
                   ),
@@ -6484,7 +6494,7 @@ class _ComplaintsHistoryScreen extends StatelessWidget {
           _historyCard(
             'CMP202601',
             'Pothole on MG Road',
-            'In Progress',
+            'InProgress',
             '2 days ago',
           ),
           _historyCard(
@@ -6513,7 +6523,7 @@ class _ComplaintsHistoryScreen extends StatelessWidget {
   Widget _historyCard(String id, String title, String status, String date) {
     Color statusColor;
     switch (status) {
-      case 'In Progress':
+      case 'InProgress':
         statusColor = const Color(0xFF4A90D9);
         break;
       case 'Under Review':

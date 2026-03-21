@@ -40,16 +40,16 @@ CREATE TABLE IF NOT EXISTS complaints (
   description               TEXT,
   damage_type               TEXT,
   severity                  TEXT DEFAULT 'Medium',
-  severity_score            FLOAT,
-  status                    TEXT DEFAULT 'New',
-  priority_score            FLOAT,
-  epdo_score                FLOAT,
+  severity_score            FLOAT8,
+  status                    TEXT DEFAULT 'Open',
+  priority_score            FLOAT8,
+  epdo_score                FLOAT8,
 
   -- Location
-  lat                       DOUBLE PRECISION,
-  lng                       DOUBLE PRECISION,
+  latitude                  FLOAT8,
+  longitude                 FLOAT8,
   location                  TEXT,         -- human-readable address
-  ward                      TEXT,
+  ward_zone                 TEXT,
 
   -- Assignment
   assigned_to               TEXT,
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS complaints (
   after_images              TEXT[],
 
   -- AI / verification
-  ssim_score                FLOAT,
+  ssim_score                FLOAT8,
   verification_status       TEXT,
   verification_hash         TEXT,
   total_potholes            INT,
@@ -85,16 +85,15 @@ CREATE TABLE IF NOT EXISTS complaints (
   sla_deadline               TIMESTAMPTZ,
 
   -- Timestamps
-  submitted_date             TIMESTAMPTZ DEFAULT now(),
+  created_at                 TIMESTAMPTZ DEFAULT now(),
   verified_date              TIMESTAMPTZ,
   last_update                TIMESTAMPTZ DEFAULT now(),
-  created_at                 TIMESTAMPTZ DEFAULT now(),
   updated_at                 TIMESTAMPTZ DEFAULT now()
 );
 
 -- Index for spatial bounding-box queries (dedup phase)
-CREATE INDEX IF NOT EXISTS idx_complaints_coords ON complaints (lat, lng);
-CREATE INDEX IF NOT EXISTS idx_complaints_ward   ON complaints (ward);
+CREATE INDEX IF NOT EXISTS idx_complaints_coords ON complaints (latitude, longitude);
+CREATE INDEX IF NOT EXISTS idx_complaints_ward   ON complaints (ward_zone);
 CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints (status);
 
 -- ──────────────────────────────────────

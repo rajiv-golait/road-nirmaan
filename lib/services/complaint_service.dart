@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -62,7 +63,11 @@ class ComplaintService {
         'remarks': remarks,
         'metadata': metadata,
       });
-    } catch (_) {}
+    } catch (e) {
+      debugPrint(
+        'Failed to record event: $e. Complaint saved but audit trail missing.',
+      );
+    }
   }
 
   DateTime? _toDateTime(dynamic value) {
@@ -93,7 +98,9 @@ class ComplaintService {
               .where((item) => item.trim().isNotEmpty)
               .toList();
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Failed to parse image list: $e');
+      }
     }
 
     if (raw.startsWith('{') && raw.endsWith('}')) {
@@ -111,15 +118,16 @@ class ComplaintService {
   }
 
   Map<String, dynamic> mapRowToApp(Map<String, dynamic> row) {
-    final lat = row['lat'] as num?;
-    final lng = row['lng'] as num?;
+    final lat = row['latitude'] as num?;
+    final lng = row['longitude'] as num?;
     return {
       'id': row['id'],
       'title': row['title'],
       'description': row['description'],
       'damageType': row['damage_type'],
       'location': row['location'],
-      'ward': row['ward'],
+      'wardZone': row['ward_zone'],
+      'ward': row['ward_zone'],
       'coords': (lat != null && lng != null)
           ? LatLng(lat.toDouble(), lng.toDouble())
           : null,
@@ -130,8 +138,8 @@ class ComplaintService {
       'totalPotholes': (row['total_potholes'] as num?)?.toInt(),
       'aiSource': row['ai_source'],
       'locationIsApproximate': row['location_is_approximate'] as bool? ?? false,
-      'status': row['status'] ?? 'New',
-      'submittedDate': _toDateTime(row['submitted_date']),
+      'status': row['status'] ?? 'Open',
+      'submittedDate': _toDateTime(row['created_at']),
       'verifiedDate': _toDateTime(row['verified_date']),
       'lastUpdate': _toDateTime(row['last_update']),
       'assignedTo': row['assigned_to'],
@@ -161,11 +169,15 @@ class ComplaintService {
     if (app.containsKey('description')) row['description'] = app['description'];
     if (app.containsKey('damageType')) row['damage_type'] = app['damageType'];
     if (app.containsKey('location')) row['location'] = app['location'];
-    if (app.containsKey('ward')) row['ward'] = app['ward'];
+    if (app.containsKey('wardZone')) {
+      row['ward_zone'] = app['wardZone'];
+    } else if (app.containsKey('ward')) {
+      row['ward_zone'] = app['ward'];
+    }
     if (app['coords'] != null) {
       final coords = app['coords'] as LatLng;
-      row['lat'] = coords.latitude;
-      row['lng'] = coords.longitude;
+      row['latitude'] = coords.latitude;
+      row['longitude'] = coords.longitude;
     }
     if (app.containsKey('severity')) row['severity'] = app['severity'];
     if (app.containsKey('severityScore'))
@@ -177,7 +189,7 @@ class ComplaintService {
       row['total_potholes'] = app['totalPotholes'];
     if (app.containsKey('status')) row['status'] = app['status'];
     if (app.containsKey('submittedDate'))
-      row['submitted_date'] = (app['submittedDate'] as DateTime)
+      row['created_at'] = (app['submittedDate'] as DateTime)
           .toIso8601String();
     if (app.containsKey('verifiedDate'))
       row['verified_date'] = (app['verifiedDate'] as DateTime?)
@@ -280,9 +292,10 @@ class ComplaintService {
               'location_is_approximate': payload['locationIsApproximate'],
             },
           );
-        } catch (_) {
-          // Log but don't fail — the complaint is more important
-          // than its audit trail.
+        } catch (e) {
+          debugPrint(
+            'Failed to record submission event: $e. Continuing without audit row.',
+          );
         }
 
         return mapped;
@@ -310,14 +323,18 @@ class ComplaintService {
           .from('complaint_votes')
           .delete()
           .eq('complaint_id', complaintId);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Failed to delete complaint_votes for $complaintId: $e');
+    }
 
     try {
       await _client
           .from('complaint_events')
           .delete()
           .eq('complaint_id', complaintId);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Failed to delete complaint_events for $complaintId: $e');
+    }
 
     await _client.from('complaints').delete().eq('id', complaintId);
   }
@@ -372,7 +389,7 @@ class ComplaintService {
   }) async {
     final normalizedRemarks = remarks?.trim();
     final update = {
-      'status': 'In Progress',
+      'status': 'InProgress',
       'assignedTo': assignee,
       'assignedPartyType': assigneeType,
       'workGang': workGang,
@@ -427,7 +444,7 @@ class ComplaintService {
     final payload = mapAppToRow({
       ...existingComplaint,
       ...verificationData,
-      'status': verificationData['status'] ?? 'Pending CE Authorization',
+      'status': verificationData['status'] ?? 'PendingCEApproval',
       'currentHandler': complaintRoleCE,
       'receivedAtCurrentLevel': DateTime.now(),
       'escalatedFrom': currentHandler,
@@ -445,7 +462,7 @@ class ComplaintService {
     required Map<String, dynamic> existingComplaint,
   }) async {
     final update = {
-      'status': 'In Progress',
+      'status': 'Resolved',
       'lastUpdate': DateTime.now(),
       'receivedAtCurrentLevel': DateTime.now(),
     };
@@ -542,10 +559,10 @@ class ComplaintService {
     final response = await _client
         .from('complaints')
         .select()
-        .gte('lat', latitude - delta)
-        .lte('lat', latitude + delta)
-        .gte('lng', longitude - delta)
-        .lte('lng', longitude + delta);
+        .gte('latitude', latitude - delta)
+        .lte('latitude', latitude + delta)
+        .gte('longitude', longitude - delta)
+        .lte('longitude', longitude + delta);
     final rows = (response as List<dynamic>).cast<Map<String, dynamic>>();
     return rows
         .where((row) {
@@ -615,7 +632,8 @@ class ComplaintService {
           )
           .whereType<String>()
           .toSet();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Failed to fetch upvoted complaints: $e');
       return <String>{};
     }
   }

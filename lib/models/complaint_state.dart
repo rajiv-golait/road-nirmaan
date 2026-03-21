@@ -25,7 +25,7 @@ extension ComplaintStatusExtension on ComplaintStatus {
       case ComplaintStatus.assigned:
         return 'Assigned';
       case ComplaintStatus.inProgress:
-        return 'In Progress';
+        return 'InProgress';
       case ComplaintStatus.resolved:
         return 'Resolved';
       case ComplaintStatus.closed:

@@ -249,7 +249,7 @@ class _HomeViewState extends State<_HomeView> {
             const SizedBox(width: 12),
             _StatCard(
               icon: Icons.construction_outlined,
-              label: 'Work in Progress',
+              label: 'Work InProgress',
               value: '$_workInProgress',
               color: const Color(0xFF7D622A), // Darker authoritative amber
               bgColor: const Color(0xFFEBDDBE), // Stronger muted sand
@@ -257,8 +257,8 @@ class _HomeViewState extends State<_HomeView> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => _ComplaintListView(
-                    title: 'Work in Progress',
-                    filterStatus: 'In Progress',
+                    title: 'Work InProgress',
+                    filterStatus: 'InProgress',
                     onLocationClick: widget.onLocationClick,
                   ),
                 ),
@@ -430,7 +430,7 @@ class _ComplaintTrackCard extends StatelessWidget {
         return Colors.orange;
       case 'Pending':
         return const Color(0xFFCBB17D);
-      case 'In Progress':
+      case 'InProgress':
         return const Color(0xFF4A90D9);
       case 'Resolved':
         return const Color(0xFF7DB89A);
@@ -663,7 +663,7 @@ class _ComplaintDetailScreenState extends State<_ComplaintDetailScreen> {
         return Colors.orange;
       case 'Pending':
         return const Color(0xFFCBB17D);
-      case 'In Progress':
+      case 'InProgress':
         return const Color(0xFF4A90D9);
       case 'Resolved':
         return const Color(0xFF7DB89A);
@@ -1446,7 +1446,7 @@ class _MapViewState extends State<_MapView> {
   Widget _statusBadge(String status) {
     Color color;
     switch (status) {
-      case 'In Progress':
+      case 'InProgress':
         color = const Color(0xFF4A90D9);
         break;
       case 'Pending':
@@ -1574,7 +1574,7 @@ class _MapViewState extends State<_MapView> {
                 children: [
                   _legendItem('Resolved', Colors.green),
                   const SizedBox(width: 12),
-                  _legendItem('In Progress', Colors.blue),
+                  _legendItem('InProgress', Colors.blue),
                   const SizedBox(width: 12),
                   _legendItem('Pending Approval', Colors.orange),
                   const SizedBox(width: 12),
@@ -1656,7 +1656,7 @@ class _ActivityViewState extends State<_ActivityView> {
       },
       'details': {
         'full_content':
-            'Municipal Corporation has initiated pothole repair work on Hotgi Road following multiple citizen complaints. The repair crew has been deployed and work is currently in progress.\n\nWork Details:\n- Location: Hotgi Road, near Siddheshwar Temple\n- Expected completion: 2 days\n- Work timings: 8 AM - 6 PM\n\nMinor traffic delays are expected during work hours. Motorists are requested to exercise caution.',
+            'Municipal Corporation has initiated pothole repair work on Hotgi Road following multiple citizen complaints. The repair crew has been deployed and work is currently InProgress.\n\nWork Details:\n- Location: Hotgi Road, near Siddheshwar Temple\n- Expected completion: 2 days\n- Work timings: 8 AM - 6 PM\n\nMinor traffic delays are expected during work hours. Motorists are requested to exercise caution.',
         'location': 'Hotgi Road, near Siddheshwar Temple',
         'estimated_completion': '2 days',
       },
@@ -3333,7 +3333,7 @@ class _TotalComplaintsOverviewState extends State<_TotalComplaintsOverview> {
                     ),
                     const SizedBox(height: 8),
                     _statusStatRow(
-                      'Work in Progress',
+                      'Work InProgress',
                       workInProgress,
                       totalComplaints,
                       const Color(0xFFCBB17D),
@@ -3399,7 +3399,7 @@ class _TotalComplaintsOverviewState extends State<_TotalComplaintsOverview> {
                         ),
                         _buildLegendItem('Resolved', const Color(0xFF7DB89A)),
                         _buildLegendItem(
-                          'Work in Progress',
+                          'Work InProgress',
                           const Color(0xFFCBB17D),
                         ),
                         _buildLegendItem(
@@ -3691,7 +3691,7 @@ class _TotalComplaintsOverviewState extends State<_TotalComplaintsOverview> {
                               const Color(0xFF7DB89A),
                               false,
                             ),
-                            // Work in Progress
+                            // Work InProgress
                             _buildLineBarData(
                               2,
                               const [
@@ -3958,7 +3958,7 @@ class _TotalComplaintsOverviewState extends State<_TotalComplaintsOverview> {
     const curveNames = [
       'Total Complaints',
       'Resolved',
-      'Work in Progress',
+      'Work InProgress',
       'Pending/Paperwork',
     ];
 
@@ -4536,7 +4536,7 @@ class _ResolutionRateDetailViewState extends State<_ResolutionRateDetailView> {
                   const SizedBox(height: 16),
                   _calcRow('Total Complaints Reported', '$totalComplaints'),
                   _calcRow('Successfully Resolved', '$resolvedCount'),
-                  _calcRow('Work Currently in Progress', '$workInProgress'),
+                  _calcRow('Work Currently InProgress', '$workInProgress'),
                   _calcRow('Pending Initial Review', '$pendingReview'),
                 ],
               ),
@@ -4628,7 +4628,7 @@ class _ResolutionRateDetailViewState extends State<_ResolutionRateDetailView> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _legendItem('Resolved', const Color(0xFF7DB89A)),
-                      _legendItem('In Progress', const Color(0xFFCBB17D)),
+                      _legendItem('InProgress', const Color(0xFFCBB17D)),
                       _legendItem('Pending', const Color(0xFFD4B97E)),
                     ],
                   ),
@@ -5996,7 +5996,7 @@ class _ComplaintsHistoryScreen extends StatelessWidget {
           _historyCard(
             'CMP202601',
             'Pothole on MG Road',
-            'In Progress',
+            'InProgress',
             '2 days ago',
           ),
           _historyCard(
@@ -6025,7 +6025,7 @@ class _ComplaintsHistoryScreen extends StatelessWidget {
   Widget _historyCard(String id, String title, String status, String date) {
     Color statusColor;
     switch (status) {
-      case 'In Progress':
+      case 'InProgress':
         statusColor = const Color(0xFF4A90D9);
         break;
       case 'Under Review':

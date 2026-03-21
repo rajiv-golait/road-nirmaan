@@ -1,11 +1,38 @@
 -- ============================================================
 -- RoadNirman — Migration: Add missing columns to existing tables
 -- Run this AFTER schema.sql if tables already existed
+--
+-- Phase 2 (legacy DB rename): aligns old column names with Flutter/Supabase client:
+--   lat → latitude, lng → longitude, ward → ward_zone,
+--   submitted_date → created_at
+-- Idempotent: only renames when source exists and target does not (avoids duplicate
+--   column errors if schema was partially migrated).
 -- ============================================================
 
 -- Add missing columns to complaints (IF NOT EXISTS prevents errors if already there)
 DO $$
 BEGIN
+  -- Rename legacy columns to match spec (idempotent)
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'complaints' AND column_name = 'lat')
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'complaints' AND column_name = 'latitude') THEN
+    ALTER TABLE complaints RENAME COLUMN lat TO latitude;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'complaints' AND column_name = 'lng')
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'complaints' AND column_name = 'longitude') THEN
+    ALTER TABLE complaints RENAME COLUMN lng TO longitude;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'complaints' AND column_name = 'ward')
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'complaints' AND column_name = 'ward_zone') THEN
+    ALTER TABLE complaints RENAME COLUMN ward TO ward_zone;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'complaints' AND column_name = 'submitted_date')
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'complaints' AND column_name = 'created_at') THEN
+    ALTER TABLE complaints RENAME COLUMN submitted_date TO created_at;
+  END IF;
+
   -- Core columns that may be missing
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'complaints' AND column_name = 'priority_score') THEN
     ALTER TABLE complaints ADD COLUMN priority_score FLOAT;
@@ -87,6 +114,11 @@ BEGIN
 END $$;
 
 -- Create indices if missing
-CREATE INDEX IF NOT EXISTS idx_complaints_coords ON complaints (lat, lng);
-CREATE INDEX IF NOT EXISTS idx_complaints_ward   ON complaints (ward);
+CREATE INDEX IF NOT EXISTS idx_complaints_coords ON complaints (latitude, longitude);
+CREATE INDEX IF NOT EXISTS idx_complaints_ward   ON complaints (ward_zone);
 CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints (status);
+
+-- Standardize status values to documented lifecycle
+UPDATE complaints SET status = 'Open' WHERE status = 'New';
+UPDATE complaints SET status = 'InProgress' WHERE status = 'In Progress';
+UPDATE complaints SET status = 'PendingCEApproval' WHERE status IN ('Pending CE Authorization', 'Pending CE Approval');

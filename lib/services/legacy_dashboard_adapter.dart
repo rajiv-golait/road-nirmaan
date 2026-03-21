@@ -37,7 +37,7 @@ class LegacyDashboardAdapter {
   ) {
     return ComplaintStore.instance
         .getComplaintsForJE(assignedWards)
-        .where((c) => (c['status'] ?? 'New') == 'New')
+        .where((c) => (c['status'] ?? 'Open') == 'Open')
         .map(_toLegacyDetailComplaint)
         .toList();
   }
@@ -59,7 +59,7 @@ class LegacyDashboardAdapter {
         .getComplaintsForAE(assignedWards)
         .where(
           (c) =>
-              (c['status'] ?? 'New') == 'New' ||
+              (c['status'] ?? 'Open') == 'Open' ||
               (c['status'] ?? '') == 'Escalated',
         )
         .map(_toLegacyDetailComplaint)
@@ -83,7 +83,7 @@ class LegacyDashboardAdapter {
         .getComplaintsForDE(assignedWards)
         .where(
           (c) =>
-              (c['status'] ?? 'New') == 'New' ||
+              (c['status'] ?? 'Open') == 'Open' ||
               (c['status'] ?? '') == 'Escalated',
         )
         .map(_toLegacyDetailComplaint)
@@ -204,7 +204,7 @@ class LegacyDashboardAdapter {
       'location': complaint['location'],
       'coords': complaint['coords'],
       'severity': complaint['severity'] ?? 'Medium',
-      'status': complaint['status'] ?? 'New',
+      'status': complaint['status'] ?? 'Open',
       'date': _legacyShortDate(complaint['submittedDate'] as DateTime?),
       'images': complaint['images'] ?? const [],
     };
@@ -218,8 +218,8 @@ class LegacyDashboardAdapter {
       'title': complaint['title'],
       'location': complaint['location'],
       'coords': complaint['coords'],
-      'ward': complaint['ward'] ?? 'Ward',
-      'status': complaint['status'] ?? 'New',
+      'ward': complaint['wardZone'] ?? 'Ward',
+      'status': complaint['status'] ?? 'Open',
       'severity': complaint['severity'] ?? 'Medium',
       'submittedDate': complaint['submittedDate'],
       'lastUpdate': complaint['lastUpdate'] ?? complaint['submittedDate'],
