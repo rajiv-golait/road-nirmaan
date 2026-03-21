@@ -2,6 +2,8 @@
 
 **Smart road damage reporting and municipal workflow** for Solapur Municipal Corporation — citizen complaints, AI-assisted severity (Roboflow + Flask), escalation (JE → AE → DE → CE), and role-based dashboards (engineers, contractor, commissioner).
 
+**Repository:** [github.com/rajiv-golait/road-nirmaan](https://github.com/rajiv-golait/road-nirmaan)
+
 ---
 
 ## Table of contents
