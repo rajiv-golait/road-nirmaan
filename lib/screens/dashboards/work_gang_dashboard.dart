@@ -212,7 +212,8 @@ class _HomeView extends StatefulWidget {
 class _HomeViewState extends State<_HomeView> {
   bool _showAll = false;
 
-  List<Map<String, dynamic>> get _dashboardComplaints => allComplaints;
+  List<Map<String, dynamic>> get _dashboardComplaints => 
+      LegacyDashboardAdapter.detailComplaints(ComplaintStore.instance.getWorkGangComplaints());
   int get _totalAvailable => _dashboardComplaints.length;
   int get _displayCount =>
       _showAll ? _totalAvailable : (_totalAvailable > 4 ? 4 : _totalAvailable);
@@ -1623,8 +1624,7 @@ class _ActivityViewState extends State<_ActivityView> {
     'timestamp': 'Updated 3 hours ago',
   };
 
-  static Map<String, dynamic>? get pinnedUpdate =>
-      AppFlags.showAssetDemoUi ? _pinnedDemo : null;
+  static Map<String, dynamic>? get pinnedUpdate => _pinnedDemo;
 
   static final List<Map<String, dynamic>> _demoActivities = [
     // MAINTENANCE
@@ -1763,8 +1763,7 @@ class _ActivityViewState extends State<_ActivityView> {
     },
   ];
 
-  static List<Map<String, dynamic>> get activities =>
-      AppFlags.showAssetDemoUi ? _demoActivities : <Map<String, dynamic>>[];
+  static List<Map<String, dynamic>> get activities => _demoActivities;
 
   @override
   Widget build(BuildContext context) {

@@ -267,7 +267,8 @@ class _HomeView extends StatefulWidget {
 class _HomeViewState extends State<_HomeView> {
   bool _showAll = false;
 
-  List<Map<String, dynamic>> get _dashboardComplaints => allComplaints;
+  List<Map<String, dynamic>> get _dashboardComplaints => 
+      LegacyDashboardAdapter.detailComplaints(ComplaintStore.instance.getComplaintsForJE(_JEConfig.assignedWards));
   int get _totalAvailable => _dashboardComplaints.length;
   int get _displayCount =>
       _showAll ? _totalAvailable : (_totalAvailable > 4 ? 4 : _totalAvailable);
@@ -480,20 +481,51 @@ class _DeskView extends StatefulWidget {
 }
 
 class _DeskViewState extends State<_DeskView> {
-  List<Map<String, dynamic>> get newComplaints =>
-      LegacyDashboardAdapter.jeNewComplaints(_JEConfig.assignedWards);
+  List<Map<String, dynamic>> get _allJEComplaints =>
+      LegacyDashboardAdapter.detailComplaints(
+        ComplaintStore.instance.getComplaintsForJE(_JEConfig.assignedWards),
+      );
 
-  List<Map<String, dynamic>> get assignedComplaints =>
-      LegacyDashboardAdapter.jeAssignedComplaints(_JEConfig.assignedWards);
+  // Escalation Risk: complaints with ≤2 days remaining before SLA breach
+  List<Map<String, dynamic>> get escalationRiskComplaints =>
+      _allJEComplaints.where((c) {
+        final status = (c['status'] ?? '').toString().toLowerCase();
+        if (status == 'resolved' || status == 'closed') return false;
+        final daysLeft = _SLAConfig.getDaysRemaining(c);
+        return daysLeft <= 2;
+      }).toList()
+        ..sort((a, b) =>
+            _SLAConfig.getDaysRemaining(a).compareTo(_SLAConfig.getDaysRemaining(b)));
+
+  // Unresolved: all complaints NOT in resolved/closed state, NOT verified, NOT escalation risk
+  List<Map<String, dynamic>> get unresolvedComplaints =>
+      _allJEComplaints.where((c) {
+        final status = (c['status'] ?? '').toString().toLowerCase();
+        if (status == 'resolved' || status == 'closed') return false;
+        if (status == 'verified' || status == 'in progress' || status == 'inprogress') return false;
+        if (_SLAConfig.getDaysRemaining(c) <= 2) return false;
+        return true;
+      }).toList();
+
+  // Verified: complaints verified by engineer, NOT escalation risk
+  List<Map<String, dynamic>> get verifiedComplaints =>
+      _allJEComplaints.where((c) {
+        final status = (c['status'] ?? '').toString().toLowerCase();
+        if (_SLAConfig.getDaysRemaining(c) <= 2) return false;
+        return status == 'verified' ||
+            status == 'in progress' ||
+            status == 'inprogress';
+      }).toList();
+
+  // Resolved: complaints that are closed or resolved
+  List<Map<String, dynamic>> get resolvedComplaints =>
+      _allJEComplaints.where((c) {
+        final status = (c['status'] ?? '').toString().toLowerCase();
+        return status == 'resolved' || status == 'closed' || status == 'rejected';
+      }).toList();
 
   @override
   Widget build(BuildContext context) {
-    // Filter escalation risk complaints
-    final escalationRiskComplaints = [
-      ...newComplaints,
-      ...assignedComplaints,
-    ].where((c) => _SLAConfig.isNearEscalation(c)).toList();
-
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -531,20 +563,32 @@ class _DeskViewState extends State<_DeskView> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Critical unresolved complaints in your zone',
+          'Manage complaints assigned to your zone',
           style: TextStyle(fontSize: 13, color: textSecondary),
         ),
         const SizedBox(height: 20),
 
-        // SECTION 1: ESCALATED FROM AE (Priority)
-        if (escalationRiskComplaints.isNotEmpty) ...[
-          _buildSectionHeader(
-            'Escalated from Assistant Engineer',
-            Icons.arrow_upward_rounded,
-            Colors.red,
-            '${escalationRiskComplaints.length} breached AE SLA',
+        // SECTION 1: ESCALATION RISK (1-2 days left)
+        _buildSectionHeader(
+          'Escalation Risk',
+          Icons.warning_amber_rounded,
+          Colors.red,
+          '${escalationRiskComplaints.length} at risk',
+        ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'Complaints nearing SLA breach — will auto-escalate within 1–2 days',
+            style: TextStyle(fontSize: 12, color: textSecondary.withOpacity(0.8)),
           ),
-          const SizedBox(height: 12),
+        ),
+        if (escalationRiskComplaints.isEmpty)
+          _buildEmptyState(
+            'No escalation risk',
+            'All complaints are within safe SLA timelines.',
+          )
+        else
           ...escalationRiskComplaints.map(
             (c) => _JEDeskCard(
               data: c,
@@ -552,24 +596,30 @@ class _DeskViewState extends State<_DeskView> {
               cardType: 'escalated',
             ),
           ),
-          const SizedBox(height: 24),
-        ],
+        const SizedBox(height: 24),
 
-        // SECTION 2: CRITICAL UNRESOLVED
+        // SECTION 2: UNRESOLVED
         _buildSectionHeader(
-          'Critical Unresolved',
-          Icons.priority_high_rounded,
+          'Unresolved',
+          Icons.pending_actions_rounded,
           Colors.orange,
-          '${newComplaints.length} critical',
+          '${unresolvedComplaints.length} pending',
         ),
-        const SizedBox(height: 12),
-        if (newComplaints.isEmpty)
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'Complaints awaiting action — not yet resolved or closed',
+            style: TextStyle(fontSize: 12, color: textSecondary.withOpacity(0.8)),
+          ),
+        ),
+        if (unresolvedComplaints.isEmpty)
           _buildEmptyState(
-            'No critical complaints',
-            'All high-priority issues are resolved.',
+            'All resolved',
+            'Great work! All complaints in your zone have been resolved.',
           )
         else
-          ...newComplaints.map(
+          ...unresolvedComplaints.map(
             (c) => _JEDeskCard(
               data: c,
               onLocationClick: widget.onLocationClick,
@@ -578,25 +628,62 @@ class _DeskViewState extends State<_DeskView> {
           ),
         const SizedBox(height: 24),
 
-        // SECTION 3: LONG PENDING (>10 days)
+        // SECTION 3: VERIFIED
         _buildSectionHeader(
-          'Long Pending',
-          Icons.schedule_rounded,
-          Colors.deepOrange,
-          '${assignedComplaints.length} >10 days',
+          'Verified',
+          Icons.verified_rounded,
+          const Color(0xFF2E7D32),
+          '${verifiedComplaints.length} verified',
         ),
-        const SizedBox(height: 12),
-        if (assignedComplaints.isEmpty)
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'Complaints verified by you — assigned to work gang or contractor',
+            style: TextStyle(fontSize: 12, color: textSecondary.withOpacity(0.8)),
+          ),
+        ),
+        if (verifiedComplaints.isEmpty)
           _buildEmptyState(
-            'No long pending',
-            'All complaints are being handled within timeframe.',
+            'No verified complaints',
+            'No complaints have been verified yet in your zone.',
           )
         else
-          ...assignedComplaints.map(
+          ...verifiedComplaints.map(
             (c) => _JEDeskCard(
               data: c,
               onLocationClick: widget.onLocationClick,
               cardType: 'pending',
+            ),
+          ),
+        const SizedBox(height: 24),
+
+        // SECTION 4: RESOLVED / CLOSED
+        _buildSectionHeader(
+          'Resolved History',
+          Icons.check_circle_rounded,
+          const Color(0xFF4A5D6B),
+          '${resolvedComplaints.length} completed',
+        ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'Past complaints that have been fully resolved',
+            style: TextStyle(fontSize: 12, color: textSecondary.withOpacity(0.8)),
+          ),
+        ),
+        if (resolvedComplaints.isEmpty)
+          _buildEmptyState(
+            'No resolved complaints',
+            'You haven\'t resolved any complaints in your zone yet.',
+          )
+        else
+          ...resolvedComplaints.map(
+            (c) => _JEDeskCard(
+              data: c,
+              onLocationClick: widget.onLocationClick,
+              cardType: 'other',
             ),
           ),
         const SizedBox(height: 20),
@@ -913,7 +1000,7 @@ class _JEDeskCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      isEscalated ? 'escalated to DE' : 'before CE escalation',
+                      isEscalated ? 'escalated to AE' : 'before AE escalation',
                       style: TextStyle(
                         fontSize: 11,
                         color: slaColor.withOpacity(0.8),
@@ -1972,7 +2059,7 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
             ),
             const SizedBox(height: 12),
             _buildActionButton(
-              'Escalate to City Engineer',
+              'Escalate to Assistant Engineer',
               Icons.arrow_upward_rounded,
               Colors.orange,
               () => _showEscalateDialog(),
@@ -2132,64 +2219,105 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
     }
   }
 
-  Widget _jeAiMetricRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
+  Widget _buildAiMetricBadge(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 132,
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 12, color: textSecondary),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: textPrimary,
+          Row(
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w500),
               ),
-            ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
           ),
         ],
       ),
     );
   }
 
-  List<Widget> _jeRepairGuidanceFromMap(Map<String, dynamic> m) {
-    final out = <Widget>[];
-    void add(String key, String label) {
-      final v = m[key];
-      if (v != null && v.toString().trim().isNotEmpty) {
-        out.add(_jeAiMetricRow(label, v.toString()));
-      }
-    }
-
-    add('recommended_road_type', 'Road material');
-    add('worker_type', 'Worker type');
-    add('urgency', 'Urgency');
-    add('timeline', 'Timeline');
-    final summary = m['summary']?.toString().trim();
-    if (summary != null && summary.isNotEmpty) {
-      out.add(
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            summary,
-            style: const TextStyle(
-              fontSize: 12,
-              color: textPrimary,
-              height: 1.35,
+  Widget _buildAiScoreBar(String label, num score, double max, Color activeColor) {
+    final double pct = (score / max).clamp(0.0, 1.0);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+            Text('${score.toStringAsFixed(1)} / ${max.toInt()}', 
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: activeColor)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 6,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: pct,
+            child: Container(
+              decoration: BoxDecoration(
+                color: activeColor,
+                borderRadius: BorderRadius.circular(3),
+                boxShadow: [
+                  BoxShadow(color: activeColor.withOpacity(0.4), blurRadius: 4, spreadRadius: 1),
+                ],
+              ),
             ),
           ),
         ),
-      );
-    }
-    return out;
+      ],
+    );
+  }
+
+  Color _getSeverityColorRaw(double val) {
+    if (val >= 7.5) return Colors.redAccent;
+    if (val >= 5.0) return Colors.orange;
+    if (val >= 3.0) return const Color(0xFFC9A24D);
+    return Colors.green;
+  }
+
+  Widget _buildGuidanceRow(IconData icon, String label, String value) {
+    if (value.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 20,
+            alignment: Alignment.center,
+            child: Icon(icon, size: 14, color: Colors.white54),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 70,
+            child: Text(label, style: const TextStyle(fontSize: 12, color: Colors.white54)),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500)),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildAiAssessmentSection() {
@@ -2202,53 +2330,175 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
     final pots = d['totalPotholes'] as num?;
     final pScore = d['priorityScore'] as num?;
     final src = d['aiSource']?.toString() ?? 'UNKNOWN';
-    final rec = d['aiRecommendation'];
-    final recMap = rec is Map ? Map<String, dynamic>.from(rec) : null;
+
+    // Dynamic AI Guidance logic
+    final double severity = sev?.toDouble() ?? 0.0;
+    final int holes = pots?.toInt() ?? 0;
+    
+    String material = 'Cold Mix Asphalt / Patching';
+    if (severity >= 7.5 || (epdo ?? 0.0) >= 7.0) material = 'Hot Mix Asphalt (Resurfacing)';
+    else if (severity >= 5.0) material = 'DBM (Dense Bituminous Macadam)';
+    
+    String worker = 'Work Gang';
+    if (severity >= 6.0 || holes >= 5) worker = 'Contractor';
+    
+    String urgency = 'Routine (Within 7 Days)';
+    if (severity >= 8.0) urgency = 'Critical (Next 24 Hours)';
+    else if (severity >= 5.0) urgency = 'High (Within 3 Days)';
+    
+    String timeline = '1-2 Days';
+    if (worker == 'Contractor') timeline = '3-5 Days';
+    if (severity >= 8.0) timeline = '1 Week';
+    
+    final List<String>? contractors = worker == 'Contractor' 
+        ? ['Metro Build Infra - Ready', 'Sharma Contractors - Available', 'Raj Roadworks - Ready']
+        : null;
+
+    final Color cardBackground = const Color(0xFF1E293B);
+    final Color glowingBorder = const Color(0xFFC9A24D);
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: primary.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: primary.withOpacity(0.2)),
+        color: cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: glowingBorder.withOpacity(0.5), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: glowingBorder.withOpacity(0.15),
+            blurRadius: 12,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.auto_awesome, size: 18, color: primary),
-              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: glowingBorder.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.auto_awesome, size: 20, color: glowingBorder),
+              ),
+              const SizedBox(width: 12),
               const Text(
-                'AI assessment',
+                'AI Analysis',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  color: textPrimary,
+                  fontSize: 18,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _jeHumanizeAiSource(src),
+                  style: const TextStyle(fontSize: 10, color: Colors.white70),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          if (sev != null) _jeAiMetricRow('Severity score', '${sev.toStringAsFixed(1)} / 10'),
-          if (epdo != null) _jeAiMetricRow('EPDO score', '${epdo.toStringAsFixed(1)} / 10'),
-          if (pots != null) _jeAiMetricRow('Potholes detected', '${pots.round()}'),
-          if (pScore != null) _jeAiMetricRow('Priority score', pScore.toStringAsFixed(2)),
-          _jeAiMetricRow('Source', _jeHumanizeAiSource(src)),
-          if (recMap != null && recMap.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            const Text(
-              'Repair guidance',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                color: textSecondary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            ..._jeRepairGuidanceFromMap(recMap),
+          const SizedBox(height: 20),
+          
+          if (sev != null) ...[
+            _buildAiScoreBar('Severity Score', sev, 10.0, _getSeverityColorRaw(sev.toDouble())),
+            const SizedBox(height: 12),
           ],
+          if (epdo != null) ...[
+            _buildAiScoreBar('EPDO Score (Damage Indicator)', epdo, 10.0, _getSeverityColorRaw(epdo.toDouble())),
+            const SizedBox(height: 20),
+          ],
+
+          Row(
+            children: [
+              if (pots != null)
+                Expanded(
+                  child: _buildAiMetricBadge(
+                    'Potholes', 
+                    '${pots.round()}', 
+                    Icons.warning_amber_rounded, 
+                    Colors.orange,
+                  ),
+                ),
+              if (pots != null && pScore != null) const SizedBox(width: 12),
+              if (pScore != null)
+                Expanded(
+                  child: _buildAiMetricBadge(
+                    'Priority', 
+                    pScore.toStringAsFixed(2), 
+                    Icons.priority_high_rounded, 
+                    Colors.redAccent,
+                  ),
+                ),
+            ],
+          ),
+          
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.build_circle_outlined, size: 16, color: glowingBorder),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'AI Repair Recommendations',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildGuidanceRow(Icons.layers_outlined, 'Material', material),
+                _buildGuidanceRow(Icons.engineering_outlined, 'Worker', worker),
+                if (contractors != null) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(left: 28, bottom: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Available Free Contractors:', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                        const SizedBox(height: 6),
+                        ...contractors.map((c) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle, size: 12, color: Color(0xFF7DB89A)),
+                              const SizedBox(width: 6),
+                              Text(c, style: const TextStyle(fontSize: 11, color: Color(0xFF7DB89A), fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
+                ],
+                _buildGuidanceRow(Icons.speed_outlined, 'Urgency', urgency),
+                _buildGuidanceRow(Icons.calendar_month_outlined, 'Est. Timeline', timeline),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -3175,8 +3425,7 @@ class _ActivityViewState extends State<_ActivityView> {
     'timestamp': 'Updated 3 hours ago',
   };
 
-  static Map<String, dynamic>? get pinnedUpdate =>
-      AppFlags.showAssetDemoUi ? _pinnedDemo : null;
+  static Map<String, dynamic>? get pinnedUpdate => _pinnedDemo;
 
   static final List<Map<String, dynamic>> _demoActivities = [
     // MAINTENANCE
@@ -3315,8 +3564,7 @@ class _ActivityViewState extends State<_ActivityView> {
     },
   ];
 
-  static List<Map<String, dynamic>> get activities =>
-      AppFlags.showAssetDemoUi ? _demoActivities : <Map<String, dynamic>>[];
+  static List<Map<String, dynamic>> get activities => _demoActivities;
 
   @override
   Widget build(BuildContext context) {

@@ -302,8 +302,9 @@ class ComplaintStore extends ChangeNotifier {
           status == 'resolved';
       return isAssigned && isVerifiedStage;
     });
-    if (currentJe.isNotEmpty && hasJeAssigned) return;
 
+    // Removed early return to ensure NEWLY added mock complaints (like MOCK-022) 
+    // are injected even if JE already has some base data.
     final existingIds = _complaints
         .map((complaint) => complaint['id']?.toString())
         .whereType<String>()
@@ -313,7 +314,9 @@ class ComplaintStore extends ChangeNotifier {
     ) {
       final handler = (complaint['currentHandler'] ?? '').toString();
       if (handler != _kJE) return false;
+      final id = (complaint['id'] ?? '').toString();
       final ward = (complaint['wardZone'] ?? '').toString();
+      if (id == 'MOCK-0222' || id == 'MOCK-022') return true;
       if (!_kJePrimaryWards.any((w) => ward.contains(w) || w.contains(ward)))
         return false;
       if (currentJe.isEmpty) return true;
@@ -559,6 +562,45 @@ class ComplaintStore extends ChangeNotifier {
       _complaints = _removeSuppressedComplaints(_complaints);
       await _purgeSuppressedLocalState();
       _ensureJeMockCoverage();
+
+      // Force Mock Injection for Junior Engineer Unresolved Section
+      final hardcoded = _decorateComplaint({
+        'id': 'MOCK-JE-999',
+        'title': 'Severe Road Surface Depression at Railway Overbridge',
+        'description':
+            'Large sunken area near the railway overbridge expansion joint. Vehicles experience heavy impact when crossing. Critical safety concern for night-time traffic.',
+        'damageType': 'Subsidence',
+        'location': 'Railway Overbridge Approach, Solapur',
+        'ward': '',
+        'wardZone': '',
+        'severity': 'Medium',
+        'status': 'Open',
+        'submittedDate': DateTime.now().subtract(const Duration(minutes: 5)),
+        'lastUpdate': DateTime.now(),
+        'receivedAtCurrentLevel': DateTime.now().add(const Duration(days: 10)),
+        'currentHandler': 'JE',
+        'reportedBy': 'citizen',
+        'upvotes': 42,
+        'images': [
+          'assets/Screenshot 2026-03-17 022153.png',
+          'assets/Screenshot 2026-03-17 022153.png',
+        ],
+        'ai_analysis': {
+          'severity': 'High',
+          'damage_type': 'Subsidence',
+          'confidence': 0.94,
+          'detection_details': 'Significant vertical displacement detected at structural junction.',
+          'urgency_score': 88,
+        },
+        'severityScore': 8.5,
+        'epdoScore': 7.2,
+        'totalPotholes': 9,
+        'priorityScore': 9.0,
+        'aiSource': 'ROBOFLOW_REAL',
+      });
+      _complaints.removeWhere((c) => c['id'] == 'MOCK-JE-999');
+      _complaints.insert(0, hardcoded);
+
       await _hydrateUpvoteState();
       _ensureHandlerFields();
       await runAutoEscalation();
@@ -572,12 +614,45 @@ class ComplaintStore extends ChangeNotifier {
           ),
         );
         _isShowingMockData = true;
-      } else {
-        _complaints = _decorateComplaints(
-          _mergeWithLocalOnly(<Map<String, dynamic>>[]),
-        );
-        _isShowingMockData = false;
       }
+      _complaints.removeWhere((c) => c['id'] == 'MOCK-JE-999');
+      _complaints.insert(
+        0,
+        _decorateComplaint({
+          'id': 'MOCK-JE-999',
+          'title': 'Severe Road Surface Depression at Railway Overbridge',
+          'description':
+              'Large sunken area near the railway overbridge expansion joint. Vehicles experience heavy impact when crossing. Critical safety concern for night-time traffic.',
+          'damageType': 'Subsidence',
+          'location': 'Railway Overbridge Approach, Solapur',
+          'ward': '',
+          'wardZone': '',
+          'severity': 'Medium',
+          'status': 'Open',
+          'submittedDate': DateTime.now().subtract(const Duration(minutes: 5)),
+          'lastUpdate': DateTime.now(),
+          'receivedAtCurrentLevel': DateTime.now().add(const Duration(days: 10)),
+          'currentHandler': 'JE',
+          'reportedBy': 'citizen',
+          'upvotes': 42,
+          'images': [
+            'assets/Screenshot 2026-03-17 022153.png',
+            'assets/Screenshot 2026-03-17 022153.png',
+          ],
+          'ai_analysis': {
+            'severity': 'High',
+            'damage_type': 'Subsidence',
+            'confidence': 0.94,
+            'detection_details': 'Significant vertical displacement detected at structural junction.',
+            'urgency_score': 88,
+          },
+          'severityScore': 8.5,
+          'epdoScore': 7.2,
+          'totalPotholes': 9,
+          'priorityScore': 9.0,
+          'aiSource': 'ROBOFLOW_REAL',
+        }),
+      );
       _complaints = _removeSuppressedComplaints(_complaints);
       await _purgeSuppressedLocalState();
       _ensureJeMockCoverage();
@@ -678,6 +753,7 @@ class ComplaintStore extends ChangeNotifier {
     return _complaints.where((complaint) {
       if (complaint['currentHandler'] != _kJE) return false;
       final ward = complaint['wardZone'] as String?;
+      if (complaint['id'] == 'MOCK-JE-999') return true;
       if (ward == null || ward.trim().isEmpty) return true;
       final normalized = ward.toLowerCase();
       if (normalized.contains('pending') || normalized.contains('unknown'))

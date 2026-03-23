@@ -517,6 +517,23 @@ class MockDataSeeder {
       'days_ago': 2,
       'verified_days_ago': 1,
     },
+    {
+      'id': 'MOCK-0222',
+      'title': 'Severe Road Surface Depression at Railway Overbridge',
+      'description':
+          'Large sunken area near the railway overbridge expansion joint. Vehicles experience heavy impact when crossing. Critical safety concern for night-time traffic.',
+      'damage_type': 'Subsidence',
+      'location': 'Railway Overbridge Approach, Solapur',
+      'ward': '',
+      'lat': 17.6740,
+      'lng': 75.9125,
+      'severity': 'Medium',
+      'status': 'Open',
+      'current_handler': 'JE',
+      'reported_by': 'citizen',
+      'upvotes': 5,
+      'days_ago': -5,
+    },
   ];
 
   Future<bool> isDatabaseEmpty() async {
@@ -642,6 +659,7 @@ class MockDataSeeder {
         'damageType': mock['damage_type'],
         'location': mock['location'],
         'ward': mock['ward'],
+        'wardZone': mock['ward'],
         'coords': LatLng(
           (mock['lat'] as num?)?.toDouble() ?? 17.6599,
           (mock['lng'] as num?)?.toDouble() ?? 75.9064,

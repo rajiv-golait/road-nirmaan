@@ -232,7 +232,8 @@ class _HomeView extends StatefulWidget {
 class _HomeViewState extends State<_HomeView> {
   bool _showAll = false;
 
-  List<Map<String, dynamic>> get _dashboardComplaints => allComplaints;
+  List<Map<String, dynamic>> get _dashboardComplaints => 
+      LegacyDashboardAdapter.detailComplaints(ComplaintStore.instance.complaints);
   int get _totalAvailable => _dashboardComplaints.length;
   int get _displayCount =>
       _showAll ? _totalAvailable : (_totalAvailable > 4 ? 4 : _totalAvailable);
@@ -451,36 +452,39 @@ class _DeskView extends StatefulWidget {
 }
 
 class _DeskViewState extends State<_DeskView> {
+  List<Map<String, dynamic>> get _allNagarsevakComplaints => allComplaints;
+
+  List<Map<String, dynamic>> get escalationRiskComplaints =>
+      _allNagarsevakComplaints.where((c) {
+        final status = (c['status'] ?? '').toString().toLowerCase();
+        if (status == 'resolved' || status == 'closed' || status == 'rejected') return false;
+        return _SLAConfig.getDaysRemaining(c) <= 2 || status == 'escalated';
+      }).toList();
+
   List<Map<String, dynamic>> get newComplaints =>
-      LegacyDashboardAdapter.detailComplaints(
-        ComplaintStore.instance.complaints.where((c) {
-          final status = (c['status'] ?? '').toString().trim().toLowerCase();
-          return status == 'Open' ||
-              status == 'under review' ||
-              status == 'escalated';
-        }),
-      );
+      _allNagarsevakComplaints.where((c) {
+        final status = (c['status'] ?? '').toString().toLowerCase();
+        if (status == 'resolved' || status == 'closed' || status == 'rejected') return false;
+        if (status == 'escalated' || _SLAConfig.getDaysRemaining(c) <= 2) return false;
+        return status == 'open' || status == 'under review' || status == 'pending';
+      }).toList();
 
   List<Map<String, dynamic>> get assignedComplaints =>
-      LegacyDashboardAdapter.detailComplaints(
-        ComplaintStore.instance.complaints.where((c) {
-          final assignedTo = (c['assignedTo'] ?? '').toString().trim();
-          if (assignedTo.isEmpty) return false;
-          final status = (c['status'] ?? '').toString().trim().toLowerCase();
-          return status == 'verified' ||
-              status == 'InProgress' ||
-              status == 'resolved';
-        }),
-      );
+      _allNagarsevakComplaints.where((c) {
+        final status = (c['status'] ?? '').toString().toLowerCase();
+        if (status == 'resolved' || status == 'closed' || status == 'rejected') return false;
+        if (status == 'escalated' || _SLAConfig.getDaysRemaining(c) <= 2) return false;
+        return status == 'verified' || status == 'in progress' || status == 'inprogress' || status == 'pending ce authorization';
+      }).toList();
+
+  List<Map<String, dynamic>> get resolvedComplaints =>
+      _allNagarsevakComplaints.where((c) {
+        final status = (c['status'] ?? '').toString().toLowerCase();
+        return status == 'resolved' || status == 'closed' || status == 'rejected';
+      }).toList();
 
   @override
   Widget build(BuildContext context) {
-    // Filter escalation risk complaints
-    final escalationRiskComplaints = [
-      ...newComplaints,
-      ...assignedComplaints,
-    ].where((c) => _SLAConfig.isNearEscalation(c)).toList();
-
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -587,7 +591,26 @@ class _DeskViewState extends State<_DeskView> {
               showSLA: false,
             ),
           ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
+
+        // SECTION C: RESOLVED / CLOSED
+        if (resolvedComplaints.isNotEmpty) ...[
+          _buildSectionHeader(
+            'Resolved History',
+            Icons.check_circle_rounded,
+            const Color(0xFF4A5D6B),
+            '${resolvedComplaints.length} completed',
+          ),
+          const SizedBox(height: 12),
+          ...resolvedComplaints.map(
+            (c) => _JEDeskCard(
+              data: c,
+              onLocationClick: widget.onLocationClick,
+              showSLA: false,
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
       ],
     );
   }
@@ -2985,8 +3008,7 @@ class _ActivityViewState extends State<_ActivityView> {
     'timestamp': 'Updated 3 hours ago',
   };
 
-  static Map<String, dynamic>? get pinnedUpdate =>
-      AppFlags.showAssetDemoUi ? _pinnedDemo : null;
+  static Map<String, dynamic>? get pinnedUpdate => _pinnedDemo;
 
   static final List<Map<String, dynamic>> _demoActivities = [
     // MAINTENANCE
@@ -3125,8 +3147,7 @@ class _ActivityViewState extends State<_ActivityView> {
     },
   ];
 
-  static List<Map<String, dynamic>> get activities =>
-      AppFlags.showAssetDemoUi ? _demoActivities : <Map<String, dynamic>>[];
+  static List<Map<String, dynamic>> get activities => _demoActivities;
 
   @override
   Widget build(BuildContext context) {
