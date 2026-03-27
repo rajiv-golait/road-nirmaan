@@ -114,6 +114,7 @@ class ComplaintStore extends ChangeNotifier {
   bool _isLoading = false;
   String? _fetchError;
   bool _isShowingMockData = false;
+  RealtimeChannel? _complaintsChannel;
 
   List<Map<String, dynamic>> get complaints => List.unmodifiable(_complaints);
   bool get isLoading => _isLoading;
@@ -123,7 +124,23 @@ class ComplaintStore extends ChangeNotifier {
 
   void initialize() {
     if (_initialized) return;
+    _subscribeToComplaintChanges();
     _initialized = true;
+  }
+
+  void _subscribeToComplaintChanges() {
+    _complaintsChannel?.unsubscribe();
+    _complaintsChannel = Supabase.instance.client
+        .channel('public:complaints:store')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'complaints',
+          callback: (_) {
+            unawaited(fetchComplaints());
+          },
+        )
+        .subscribe();
   }
 
   Map<String, dynamic>? getComplaintById(String complaintId) {
@@ -1310,15 +1327,17 @@ class ComplaintStore extends ChangeNotifier {
   }
 
   Future<void> deleteComplaint(String complaintId) async {
-    try {
+    await _ensureLocalOnlyComplaintsLoaded();
+    final isLocalOnly = _localOnlyComplaints.any(
+      (complaint) => complaint['id']?.toString() == complaintId,
+    );
+
+    if (!isLocalOnly) {
       await ComplaintService.instance.deleteComplaint(complaintId);
-    } catch (_) {
-      // Keep local workflow functional when backend is unavailable.
     }
     _complaints.removeWhere(
       (complaint) => complaint['id']?.toString() == complaintId,
     );
-    await _ensureLocalOnlyComplaintsLoaded();
     _localOnlyComplaints.removeWhere(
       (complaint) => complaint['id']?.toString() == complaintId,
     );
@@ -1329,6 +1348,7 @@ class ComplaintStore extends ChangeNotifier {
     await _persistLocalReportedIds();
     await _persistLocalVoteState();
     notifyListeners();
+    unawaited(fetchComplaints());
   }
 
   Future<String?> createCitizenComplaintWithUploads({

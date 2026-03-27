@@ -268,7 +268,12 @@ class ComplaintService {
   Future<List<Map<String, dynamic>>> fetchComplaints() async {
     final response = await _client.from('complaints').select();
     final rows = (response as List<dynamic>).cast<Map<String, dynamic>>();
-    return rows.map(mapRowToApp).toList();
+    return rows
+        .where(
+          (row) => (row['status'] ?? '').toString().toLowerCase() != 'deleted',
+        )
+        .map(mapRowToApp)
+        .toList();
   }
 
   Future<Map<String, dynamic>> createComplaint(
@@ -327,24 +332,37 @@ class ComplaintService {
 
   Future<void> deleteComplaint(String complaintId) async {
     try {
-      await _client
-          .from('complaint_votes')
+      final deletedRows = await _client
+          .from('complaints')
           .delete()
-          .eq('complaint_id', complaintId);
+          .eq('id', complaintId)
+          .select('id');
+      if (deletedRows is List && deletedRows.isNotEmpty) {
+        return;
+      }
     } catch (e) {
-      debugPrint('Failed to delete complaint_votes for $complaintId: $e');
+      debugPrint(
+        'Hard delete failed for $complaintId, falling back to soft delete: $e',
+      );
     }
 
-    try {
-      await _client
-          .from('complaint_events')
-          .delete()
-          .eq('complaint_id', complaintId);
-    } catch (e) {
-      debugPrint('Failed to delete complaint_events for $complaintId: $e');
+    final updatedRows = await _client
+        .from('complaints')
+        .update({
+          'status': 'Deleted',
+          'last_update': DateTime.now().toIso8601String(),
+        })
+        .eq('id', complaintId)
+        .select('id, status');
+    if (updatedRows is! List || updatedRows.isEmpty) {
+      throw Exception('Delete failed for complaint $complaintId.');
     }
-
-    await _client.from('complaints').delete().eq('id', complaintId);
+    await _recordEvent(
+      complaintId: complaintId,
+      eventType: 'deleted',
+      toStatus: 'Deleted',
+      remarks: 'Complaint deleted by reporting user.',
+    );
   }
 
   Future<Map<String, dynamic>> saveOfficialRemarks({
@@ -587,7 +605,9 @@ class ComplaintService {
     return rows
         .where((row) {
           final status = (row['status'] ?? '').toString().toLowerCase();
-          return status != 'resolved' && status != 'closed';
+          return status != 'resolved' &&
+              status != 'closed' &&
+              status != 'deleted';
         })
         .map(mapRowToApp)
         .toList();

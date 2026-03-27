@@ -469,10 +469,54 @@ class _ComplaintTrackCard extends StatelessWidget {
     return textSecondary;
   }
 
+  Future<void> _deleteComplaint(BuildContext context) async {
+    final complaintId = data['id']?.toString();
+    if (complaintId == null || complaintId.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Complaint'),
+        content: const Text(
+          'This complaint will be removed from your list and dashboards. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFC75D5D),
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ComplaintStore.instance.deleteComplaint(complaintId);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete complaint: $e')),
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Complaint deleted successfully')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final statusColor = _getStatusColor(data['status']);
     final verificationRemarks = data['verificationRemarks'] as List<dynamic>?;
+    final isMine = data['isMine'] == true;
 
     return GestureDetector(
       onTap: () {
@@ -506,31 +550,52 @@ class _ComplaintTrackCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  data['id'],
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: textSecondary,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                Expanded(
                   child: Text(
-                    data['status'],
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 11,
+                    data['id'],
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: textSecondary,
                     ),
                   ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        data['status'],
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    if (isMine) ...[
+                      const SizedBox(width: 6),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: Color(0xFFC75D5D),
+                        ),
+                        tooltip: 'Delete complaint',
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => _deleteComplaint(context),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -693,7 +758,15 @@ class _ComplaintDetailScreenState extends State<_ComplaintDetailScreen> {
 
     if (confirmed != true) return;
 
-    await ComplaintStore.instance.deleteComplaint(complaintId);
+    try {
+      await ComplaintStore.instance.deleteComplaint(complaintId);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete complaint: $e')),
+      );
+      return;
+    }
     if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -5053,6 +5126,52 @@ class _ComplaintCard extends StatelessWidget {
     required this.onLocationClick,
   });
 
+  Future<void> _deleteComplaint(
+    BuildContext context,
+    Map<String, dynamic> complaint,
+  ) async {
+    final complaintId = complaint['id']?.toString();
+    if (complaintId == null || complaintId.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Complaint'),
+        content: const Text(
+          'This complaint will be removed from your list and dashboards. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFC75D5D),
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ComplaintStore.instance.deleteComplaint(complaintId);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete complaint: $e')),
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Complaint deleted successfully')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (data == null && allComplaints.isEmpty) {
@@ -5063,6 +5182,7 @@ class _ComplaintCard extends StatelessWidget {
 
     final double? scoreVal = (c['severityScore'] as num?)?.toDouble();
     final Color severityColor;
+    final isMine = c['isMine'] == true;
     if (scoreVal != null) {
       severityColor = scoreVal >= 7
           ? Colors.red.shade700
@@ -5165,31 +5285,52 @@ class _ComplaintCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        c['id']!.toString(),
-                        style: const TextStyle(
-                          color: textSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: severityColor.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
+                      Expanded(
                         child: Text(
-                          c['severity']!.toString(),
-                          style: TextStyle(
-                            color: severityColor,
+                          c['id']!.toString(),
+                          style: const TextStyle(
+                            color: textSecondary,
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            fontSize: 11,
                           ),
                         ),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: severityColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              c['severity']!.toString(),
+                              style: TextStyle(
+                                color: severityColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                          if (isMine) ...[
+                            const SizedBox(width: 6),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                size: 18,
+                                color: Color(0xFFC75D5D),
+                              ),
+                              tooltip: 'Delete complaint',
+                              visualDensity: VisualDensity.compact,
+                              constraints: const BoxConstraints(),
+                              onPressed: () => _deleteComplaint(context, c),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
