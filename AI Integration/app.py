@@ -56,6 +56,30 @@ def haversine(lat1, lon1, lat2, lon2):
     a = math.sin(d_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
     return 2 * radius_m * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
+def prepare_image_for_roboflow(filepath, max_dimension=1280, quality=82):
+    """
+    Downscale and normalize images before sending them to Roboflow.
+    This reduces upload/inference time and avoids unnecessary large payloads.
+    """
+    with Image.open(filepath) as img:
+        if img.mode not in ('RGB', 'L'):
+            img = img.convert('RGB')
+        else:
+            img = img.copy()
+
+        width, height = img.size
+        longest_edge = max(width, height)
+        if longest_edge > max_dimension:
+            scale = max_dimension / float(longest_edge)
+            img = img.resize(
+                (max(1, int(width * scale)), max(1, int(height * scale))),
+                Image.Resampling.LANCZOS,
+            )
+
+        optimized_path = os.path.splitext(filepath)[0] + '_rf.jpg'
+        img.save(optimized_path, format='JPEG', quality=quality, optimize=True)
+        return optimized_path
+
 def calculate_severity_score(detections, road_type, road_classification, traffic_level, location_type):
     """
     Calculate road severity score based on weighted factors:
@@ -66,7 +90,9 @@ def calculate_severity_score(detections, road_type, road_classification, traffic
     - Traffic Patterns: 20% weight
     - Location Context: Adjustment factor (±0.1)
     """
-    
+    if not detections:
+        return 0.0
+
     # Factor 1: Pothole Size (20% weight)
     size_score = 0
     if detections:
@@ -153,6 +179,9 @@ def calculate_severity_score(detections, road_type, road_classification, traffic
     return round(final_score, 2)
 
 def calculate_epdo_score(severity_score, road_classification, traffic_level, rainfall_risk, proximity_score):
+    if severity_score <= 0:
+        return 0.0
+
     # S_AI: normalize severity (0-10) to (0-1)
     s_ai = severity_score / 10.0
 
@@ -186,7 +215,17 @@ def generate_repair_recommendations(severity_score, road_type, road_classificati
     - Road type to build (Premix for urban/high traffic, Hotmix for rural/low traffic)
     - Worker type (Contractor for big tasks, Work gang for short tasks)
     """
-    
+    if severity_score <= 0:
+        return {
+            'recommended_road_type': 'Not Required',
+            'road_type_reason': 'No potholes detected by Roboflow analysis',
+            'worker_type': 'Not Required',
+            'worker_reason': 'No repair crew needed because no potholes were detected',
+            'urgency': 'NONE',
+            'timeline': 'No action required',
+            'summary': 'No potholes detected. No repair action recommended.'
+        }
+
     # Determine road material recommendation
     if location_type.lower() == 'urban' or traffic_level.lower() in ['high', 'very_high']:
         recommended_road_type = 'Premix'
@@ -605,27 +644,32 @@ def detect_flutter():
         all_detections = []
         total_sev = 0
         total_pots = 0
+        analyzed_files = 0
         
         for file in files:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
             filename = f"{timestamp}_{file.filename}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
+            inference_path = prepare_image_for_roboflow(filepath)
             
             print(f'[DETECT] Calling Roboflow: {MODEL_ID}')
-            with open(filepath, 'rb') as f:
+            with open(inference_path, 'rb') as f:
                 res = requests.post(
                     f"{API_URL}/{MODEL_ID}",
                     params={"api_key": API_KEY},
-                    files={'file': (os.path.basename(filepath), f, 'image/jpeg')}
+                    files={'file': (os.path.basename(inference_path), f, 'image/jpeg')}
                 )
             print(f'[DETECT] Roboflow status: {res.status_code}')
             if res.status_code != 200:
-                continue
+                raise Exception(
+                    f"Roboflow analysis failed for {file.filename}: "
+                    f"{res.status_code} - {res.text}"
+                )
             res_json = res.json()
             predictions = res_json.get('predictions', [])
             
-            img = Image.open(filepath)
+            img = Image.open(inference_path)
             img_w, img_h = img.size
             is_normalized = False
             if predictions:
@@ -648,12 +692,19 @@ def detect_flutter():
             total_pots += len(file_detections)
             s_score = calculate_severity_score(file_detections, road_type, road_classification, traffic_level, location_type)
             total_sev += s_score
+            analyzed_files += 1
             
-        avg_sev = total_sev / len(files) if files else 0
+        if analyzed_files == 0:
+            raise Exception('Roboflow did not analyze any image successfully.')
+
+        avg_sev = total_sev / analyzed_files
         epdo = calculate_epdo_score(avg_sev, road_classification, traffic_level, rainfall_risk, proximity_score)
         rep = generate_repair_recommendations(avg_sev, road_type, road_classification, traffic_level, location_type)
         
-        pri = 'CRITICAL' if avg_sev >= 7 else 'HIGH' if avg_sev >= 5 else 'MEDIUM' if avg_sev >= 3 else 'LOW'
+        if total_pots <= 0 or avg_sev <= 0:
+            pri = 'NONE'
+        else:
+            pri = 'CRITICAL' if avg_sev >= 7 else 'HIGH' if avg_sev >= 5 else 'MEDIUM' if avg_sev >= 3 else 'LOW'
 
         print(f'[DETECT] Detections: {len(all_detections)}')
         print(f'[DETECT] Severity: {round(avg_sev, 2)}')
@@ -759,4 +810,4 @@ def display_image(filename):
         return jsonify({'error': 'Image not found'}), 404
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)

@@ -8,6 +8,14 @@ class AiRecommendationService {
   AiRecommendationService._();
   static final AiRecommendationService instance = AiRecommendationService._();
 
+  Map<String, dynamic> buildDemoAnalysis({
+    required String imagePath,
+    double? latitude,
+    double? longitude,
+  }) {
+    return _fallbackAnalyze(imagePath, latitude ?? 0, longitude ?? 0);
+  }
+
   Future<Map<String, dynamic>> analyzeSingleImage({
     required String imagePath,
     double? latitude,
@@ -29,11 +37,11 @@ class AiRecommendationService {
       }
       throw Exception('Flask returned success!=true');
     } catch (e) {
-      debugPrint('AI: Flask unavailable, using offline fallback: $e');
-      return _fallbackAnalyze(
-        imagePath,
-        latitude ?? 0,
-        longitude ?? 0,
+      debugPrint('AI: Flask unavailable, using demo fallback: $e');
+      return buildDemoAnalysis(
+        imagePath: imagePath,
+        latitude: latitude,
+        longitude: longitude,
       );
     }
   }
@@ -60,7 +68,7 @@ class AiRecommendationService {
     };
   }
 
-  /// Offline deterministic fallback (filename + coordinates). Not Roboflow.
+  /// Demo deterministic fallback (filename + coordinates). Not Roboflow.
   Map<String, dynamic> _fallbackAnalyze(
     String imagePath,
     double latitude,
@@ -77,7 +85,7 @@ class AiRecommendationService {
       signal,
     );
 
-    final potholes = 1 + (signal % 9);
+    final potholes = 3 + (signal % 4);
     final severity = _severityScore(
       potholes: potholes,
       trafficLevel: locationParameters['traffic_level']!.toString(),
@@ -101,12 +109,20 @@ class AiRecommendationService {
         ? 'MEDIUM'
         : 'LOW';
 
+    final epdo = _epdoScore(
+      severity: severity,
+      roadClassification:
+          locationParameters['road_classification']!.toString(),
+      trafficLevel: locationParameters['traffic_level']!.toString(),
+      signal: signal,
+    );
+
     return <String, dynamic>{
       'success': true,
-      'is_offline_estimate': true,
-      'warning': 'AI server unreachable. This is an estimate only.',
+      'is_demo_ai': true,
+      'warning': 'Demo AI mode active. This is simulated analysis.',
       'severity_score': severity,
-      'epdo_score': 5.0,
+      'epdo_score': epdo,
       'priority': priority,
       'total_potholes': potholes,
       'input': <String, dynamic>{
@@ -194,6 +210,34 @@ class AiRecommendationService {
     }
     score += ((signal % 100) / 100.0) * 0.8;
     return double.parse(min(10.0, max(0.5, score)).toStringAsFixed(2));
+  }
+
+  double _epdoScore({
+    required double severity,
+    required String roadClassification,
+    required String trafficLevel,
+    required int signal,
+  }) {
+    final roadWeight = switch (roadClassification) {
+      'highway' => 0.85,
+      'arterial' => 0.65,
+      'collector' => 0.45,
+      'local' => 0.25,
+      _ => 0.35,
+    };
+    final trafficWeight = switch (trafficLevel) {
+      'high' => 0.9,
+      'medium' => 0.6,
+      'low' => 0.35,
+      _ => 0.5,
+    };
+    final noise = (signal % 25) / 100.0;
+    final score =
+        ((severity / 10.0) * 0.55) +
+        (roadWeight * 0.25) +
+        (trafficWeight * 0.20) +
+        noise;
+    return double.parse(min(10.0, max(1.5, score * 10)).toStringAsFixed(2));
   }
 
   Map<String, dynamic> _generateRepairRecommendations({

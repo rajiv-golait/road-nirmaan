@@ -502,7 +502,12 @@ class _DeskViewState extends State<_DeskView> {
       _allJEComplaints.where((c) {
         final status = (c['status'] ?? '').toString().toLowerCase();
         if (status == 'resolved' || status == 'closed') return false;
-        if (status == 'verified' || status == 'in progress' || status == 'inprogress') return false;
+        if (status == 'verified' ||
+            status == 'in progress' ||
+            status == 'inprogress' ||
+            status == 'pendingceapproval') {
+          return false;
+        }
         if (_SLAConfig.getDaysRemaining(c) <= 2) return false;
         return true;
       }).toList();
@@ -513,6 +518,7 @@ class _DeskViewState extends State<_DeskView> {
         final status = (c['status'] ?? '').toString().toLowerCase();
         if (_SLAConfig.getDaysRemaining(c) <= 2) return false;
         return status == 'verified' ||
+            status == 'pendingceapproval' ||
             status == 'in progress' ||
             status == 'inprogress';
       }).toList();
@@ -1958,6 +1964,27 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
   String? _selectedWorkGang;
   bool _isRefreshingAi = false;
 
+  String? get _complaintId => widget.data['id']?.toString();
+
+  Map<String, dynamic> get _liveComplaint {
+    final complaintId = _complaintId;
+    if (complaintId == null || complaintId.isEmpty) return widget.data;
+    return ComplaintStore.instance.getComplaintById(complaintId) ?? widget.data;
+  }
+
+  void _handleStoreUpdate() {
+    if (!mounted) return;
+    final complaintId = _complaintId;
+    if (complaintId == null || complaintId.isEmpty) return;
+    final latest = ComplaintStore.instance.getComplaintById(complaintId);
+    if (latest == null) return;
+    setState(() {
+      widget.data
+        ..clear()
+        ..addAll(latest);
+    });
+  }
+
   final List<String> _contractors = [
     'Sharma Contractors Pvt Ltd',
     'Solapur Road Builders',
@@ -1972,8 +1999,21 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
     'Gang D - Night Shift Crew',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    ComplaintStore.instance.addListener(_handleStoreUpdate);
+  }
+
+  @override
+  void dispose() {
+    ComplaintStore.instance.removeListener(_handleStoreUpdate);
+    _remarksController.dispose();
+    super.dispose();
+  }
+
   Future<void> _reloadAiAnalysis() async {
-    final complaintId = widget.data['id']?.toString();
+    final complaintId = _complaintId;
     if (complaintId == null || complaintId.isEmpty || _isRefreshingAi) return;
 
     setState(() => _isRefreshingAi = true);
@@ -2004,10 +2044,11 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final daysRemaining = _SLAConfig.getDaysRemaining(widget.data);
+    final complaint = _liveComplaint;
+    final daysRemaining = _SLAConfig.getDaysRemaining(complaint);
     final slaColor = _SLAConfig.getEscalationColor(daysRemaining);
-    final isNew = widget.data['status'] == 'Open';
-    final status = (widget.data['status'] ?? '').toString();
+    final isNew = complaint['status'] == 'Open';
+    final status = (complaint['status'] ?? '').toString();
     final canOpenVerificationFramework =
         status != 'Resolved' && status != 'PendingCEApproval';
 
@@ -2017,7 +2058,7 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
         backgroundColor: surface,
         elevation: 1,
         title: Text(
-          widget.data['id'],
+          complaint['id'],
           style: const TextStyle(
             color: textPrimary,
             fontWeight: FontWeight.bold,
@@ -2062,18 +2103,18 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
           const SizedBox(height: 20),
 
           // IMAGES
-          if (widget.data['images'] != null)
-            _buildImageCarousel(widget.data['images'] as List<dynamic>),
+          if (complaint['images'] != null)
+            _buildImageCarousel(complaint['images'] as List<dynamic>),
           const SizedBox(height: 20),
 
           // SLA TIMELINE (for new complaints)
           if (isNew) ...[
-            _buildSLATimeline(daysRemaining, slaColor, widget.data),
+            _buildSLATimeline(daysRemaining, slaColor, complaint),
             const SizedBox(height: 20),
           ],
 
           // CURRENT ASSIGNMENT (if assigned)
-          if (!isNew && widget.data['assignedTo'] != null) ...[
+          if (!isNew && complaint['assignedTo'] != null) ...[
             _buildAssignmentCard(),
             const SizedBox(height: 20),
           ],
@@ -2118,6 +2159,7 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
   }
 
   Widget _buildComplaintHeader() {
+    final complaint = _liveComplaint;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -2140,14 +2182,14 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: _getSeverityColor(
-                    widget.data['severity'],
+                    complaint['severity'],
                   ).withOpacity(0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  widget.data['severity'],
+                  complaint['severity'],
                   style: TextStyle(
-                    color: _getSeverityColor(widget.data['severity']),
+                    color: _getSeverityColor(complaint['severity']),
                     fontWeight: FontWeight.bold,
                     fontSize: 11,
                   ),
@@ -2158,14 +2200,14 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: _getStatusColor(
-                    widget.data['status'],
+                    complaint['status'],
                   ).withOpacity(0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  widget.data['status'],
+                  complaint['status'],
                   style: TextStyle(
-                    color: _getStatusColor(widget.data['status']),
+                    color: _getStatusColor(complaint['status']),
                     fontWeight: FontWeight.bold,
                     fontSize: 11,
                   ),
@@ -2175,7 +2217,7 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            widget.data['title'],
+            complaint['title'],
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -2185,12 +2227,12 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
           const SizedBox(height: 8),
           GestureDetector(
             onTap: () {
-              if (widget.data['coords'] != null) {
-                widget.onLocationClick(
-                  widget.data['coords'],
-                  widget.data['id'],
-                );
-              }
+              final coords = complaint['coords'];
+              if (coords == null) return;
+              widget.onLocationClick(
+                coords,
+                complaint['id'],
+              );
             },
             child: Row(
               children: [
@@ -2198,7 +2240,7 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    '${widget.data['location']} • ${widget.data['ward']}',
+                    '${complaint['location']} • ${complaint['ward']}',
                     style: const TextStyle(
                       fontSize: 14,
                       color: primary,
@@ -2211,7 +2253,7 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Submitted: ${_formatDateTime(widget.data['submittedDate'])}',
+            'Submitted: ${_formatDateTime(complaint['submittedDate'])}',
             style: TextStyle(
               fontSize: 12,
               color: textSecondary.withOpacity(0.8),
@@ -2240,8 +2282,10 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
     switch ((raw ?? '').toUpperCase()) {
       case 'ROBOFLOW_REAL':
         return 'AI analysis (Roboflow)';
-      case 'OFFLINE_ESTIMATE':
-        return 'Offline estimate (server unreachable)';
+      case 'DEMO_SIMULATED':
+        return 'Demo AI (simulated)';
+      case 'ANALYSIS_FAILED':
+        return 'AI analysis failed';
       case 'UNKNOWN':
         return 'Unknown / not recorded';
       default:
@@ -2352,7 +2396,88 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
   }
 
   Widget _buildAiAssessmentSection() {
-    final d = widget.data;
+    final d = _liveComplaint;
+    final aiSource = d['aiSource']?.toString().toUpperCase().trim() ?? '';
+    final aiResult = d['aiResult'];
+    final aiError = aiResult is Map ? aiResult['error']?.toString() : null;
+
+    if (aiSource == 'ANALYSIS_FAILED') {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFFC75D5D).withOpacity(0.5),
+            width: 1.2,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFC75D5D).withOpacity(0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.error_outline_rounded,
+                    size: 20,
+                    color: Color(0xFFC75D5D),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'AI Analysis',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _isRefreshingAi ? null : _reloadAiAnalysis,
+                  icon: _isRefreshingAi
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh_rounded, size: 16),
+                  label: Text(_isRefreshingAi ? 'Reloading' : 'Reload'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFC75D5D),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'AI analysis failed for this complaint.',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              aiError == null || aiError.isEmpty
+                  ? 'Roboflow analysis could not be completed. Reload to try again.'
+                  : aiError,
+              style: const TextStyle(color: Colors.white70, height: 1.4),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (!_jeHasAiAssessmentData(d)) {
       return Container(
         width: double.infinity,
@@ -2445,25 +2570,38 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
     // Dynamic AI Guidance logic
     final double severity = sev?.toDouble() ?? 0.0;
     final int holes = pots?.toInt() ?? 0;
-    
+
     String material = 'Cold Mix Asphalt / Patching';
-    if (severity >= 7.5 || (epdo ?? 0.0) >= 7.0) material = 'Hot Mix Asphalt (Resurfacing)';
-    else if (severity >= 5.0) material = 'DBM (Dense Bituminous Macadam)';
-    
     String worker = 'Work Gang';
-    if (severity >= 6.0 || holes >= 5) worker = 'Contractor';
-    
     String urgency = 'Routine (Within 7 Days)';
-    if (severity >= 8.0) urgency = 'Critical (Next 24 Hours)';
-    else if (severity >= 5.0) urgency = 'High (Within 3 Days)';
-    
     String timeline = '1-2 Days';
-    if (worker == 'Contractor') timeline = '3-5 Days';
-    if (severity >= 8.0) timeline = '1 Week';
-    
-    final List<String>? contractors = worker == 'Contractor' 
-        ? ['Metro Build Infra - Ready', 'Sharma Contractors - Available', 'Raj Roadworks - Ready']
-        : null;
+    List<String>? contractors;
+
+    if (holes <= 0 || severity <= 0) {
+      material = 'Not Required';
+      worker = 'Not Required';
+      urgency = 'None';
+      timeline = 'No action required';
+      contractors = null;
+    } else {
+      if (severity >= 7.5 || (epdo ?? 0.0) >= 7.0) {
+        material = 'Hot Mix Asphalt (Resurfacing)';
+      } else if (severity >= 5.0) {
+        material = 'DBM (Dense Bituminous Macadam)';
+      }
+
+      if (severity >= 6.0 || holes >= 5) worker = 'Contractor';
+
+      if (severity >= 8.0) urgency = 'Critical (Next 24 Hours)';
+      else if (severity >= 5.0) urgency = 'High (Within 3 Days)';
+
+      if (worker == 'Contractor') timeline = '3-5 Days';
+      if (severity >= 8.0) timeline = '1 Week';
+
+      contractors = worker == 'Contractor'
+          ? ['Metro Build Infra - Ready', 'Sharma Contractors - Available', 'Raj Roadworks - Ready']
+          : null;
+    }
 
     final Color cardBackground = const Color(0xFF1E293B);
     final Color glowingBorder = const Color(0xFFC9A24D);
@@ -8507,5 +8645,3 @@ class _CameraScreenState extends State<_CameraScreen> {
     );
   }
 }
-
-

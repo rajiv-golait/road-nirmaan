@@ -1,11 +1,9 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/complaint_store.dart';
-import '../services/flask_ai_service.dart';
 import '../services/storage_service.dart';
 
 const Color _primary = Color(0xFF4A5D6B);
@@ -112,10 +110,10 @@ class _VerifyComplaintScreenState extends State<VerifyComplaintScreen> {
   }
 
   Future<void> _submitVerify() async {
-    if (_fieldPhotos.length < 2) {
+    if (_fieldPhotos.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Add at least 2 field visit photos'),
+          content: Text('Add at least 1 field visit photo'),
           backgroundColor: Color(0xFFC75D5D),
         ),
       );
@@ -160,115 +158,30 @@ class _VerifyComplaintScreenState extends State<VerifyComplaintScreen> {
       final allImages = [...existingImages, ...uploadedFieldPhotos];
       final afterImages = [...uploadedFieldPhotos];
 
-      Map<String, dynamic>? verificationResult;
-      try {
-        final beforeForSsim = beforeImages.isNotEmpty
-            ? beforeImages.first
-            : (existingImages.isNotEmpty ? existingImages.first : null);
-        final afterForSsim = uploadedFieldPhotos.isNotEmpty
-            ? uploadedFieldPhotos.first
-            : null;
-        if (beforeForSsim != null && afterForSsim != null) {
-          verificationResult = await FlaskAiService.verifyRepair(
-            beforeImage: beforeForSsim,
-            afterImage: afterForSsim,
-            complaintId: widget.data['id'] as String,
-          );
-        }
-      } on TimeoutException {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Verification server unreachable. '
-              'Cannot verify without AI check. '
-              'Ensure Flask is running.',
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-        setState(() => _isSubmitting = false);
-        return;
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Verification server unreachable. '
-              'Cannot verify without AI check. '
-              '(${e.toString()})',
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-        setState(() => _isSubmitting = false);
-        return;
-      }
-
-      if (verificationResult == null) {
-        if (!mounted) return;
-        setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Could not run AI verification (missing before/after images).',
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      final verdict = verificationResult['verdict']?.toString();
-      final isRepairVerified = verdict == 'REPAIR_VERIFIED';
-      final ssimScore = verificationResult['ssim_score'];
-      final hash = verificationResult['verification_hash']?.toString();
-
-      if (!isRepairVerified) {
-        if (!mounted) return;
-        setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Repair rejected — surface appears unchanged. '
-              'SSIM score: ${ssimScore ?? '—'}. '
-              'Please complete the repair and resubmit.',
-            ),
-            backgroundColor: const Color(0xFFC75D5D),
-          ),
-        );
-        return;
-      }
-
-      await ComplaintStore.instance
-          .submitForCEAuthorization(widget.data['id'] as String, {
-            'verifiedDate': DateTime.now(),
-            'lastUpdate': DateTime.now(),
-            'officialRemarks': _remarksController.text.trim(),
-            'assignedTo': _selectedContractor ?? _selectedWorkGang,
-            'assignedPartyType': _selectedContractor != null
-                ? 'Contractor'
-                : 'Work Gang',
-            'workGang': _selectedWorkGang,
-            'images': allImages,
-            'beforeImages': beforeImages,
-            'afterImages': afterImages,
-            if (ssimScore != null) 'ssimScore': ssimScore,
-            if (hash != null) 'verificationHash': hash,
-            if (verdict != null) 'verificationStatus': verdict,
-            'status': 'PendingCEApproval',
-          });
+      await ComplaintStore.instance.submitForCEAuthorization(
+        widget.data['id'] as String,
+        {
+          'verifiedDate': DateTime.now(),
+          'lastUpdate': DateTime.now(),
+          'officialRemarks': _remarksController.text.trim(),
+          'assignedTo': _selectedContractor ?? _selectedWorkGang,
+          'assignedPartyType': _selectedContractor != null
+              ? 'Contractor'
+              : 'Work Gang',
+          'workGang': _selectedWorkGang,
+          'images': allImages,
+          'beforeImages': beforeImages,
+          'afterImages': afterImages,
+          'verificationStatus': 'FIELD_VERIFIED',
+          'status': 'PendingCEApproval',
+        },
+      );
 
       if (!mounted) return;
-      final hashPrefix =
-          hash != null && hash.length >= 16 ? '${hash.substring(0, 16)}…' : '';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Repair verified ✓  SSIM: $ssimScore'
-            '${hashPrefix.isNotEmpty ? '  ·  Hash: $hashPrefix' : ''}',
-          ),
-          backgroundColor: const Color(0xFF7DB89A),
+        const SnackBar(
+          content: Text('Complaint verified and forwarded to City Engineer'),
+          backgroundColor: Color(0xFF7DB89A),
         ),
       );
       widget.onVerified();
@@ -635,3 +548,4 @@ class _VerifyComplaintScreenState extends State<VerifyComplaintScreen> {
     return partialMatches.length == 1 ? partialMatches.first : null;
   }
 }
+

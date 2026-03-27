@@ -7,8 +7,8 @@ import '../utils/constants.dart';
 class FlaskAiService {
   static String get _baseUrl => AppConstants.flaskUrl;
 
-  /// Roboflow + scoring can exceed 15s; keep client in sync with Flask work.
-  static const Duration _httpTimeout = Duration(seconds: 90);
+  /// Keep AI responsive in the app; fall back quickly if backend is unavailable.
+  static const Duration _httpTimeout = Duration(seconds: 8);
 
   static Future<Map<String, dynamic>> analyzeImages({
     required List<dynamic> images,

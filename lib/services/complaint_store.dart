@@ -39,6 +39,8 @@ const String _kCommissioner = 'Commissioner';
 /// Maps Flask `priority` label to [complaints.priority_score] (float).
 double? _aiPriorityToPriorityScore(String? label) {
   switch (label?.toUpperCase().trim()) {
+    case 'NONE':
+      return 0.0;
     case 'CRITICAL':
       return 4.0;
     case 'HIGH':
@@ -1107,8 +1109,8 @@ class ComplaintStore extends ChangeNotifier {
         latitude: coords?.latitude,
         longitude: coords?.longitude,
       );
-    } catch (_) {
-      result = await AiRecommendationService.instance.analyzeSingleImage(
+    } catch (e) {
+      result = AiRecommendationService.instance.buildDemoAnalysis(
         imagePath: selectedImage,
         latitude: coords?.latitude,
         longitude: coords?.longitude,
@@ -1122,12 +1124,15 @@ class ComplaintStore extends ChangeNotifier {
     final severityScore = (result['severity_score'] as num?)?.toDouble();
     final epdoScore = (result['epdo_score'] as num?)?.toDouble();
     final totalPotholes = (result['total_potholes'] as num?)?.toInt();
-    final aiSource = result['is_offline_estimate'] == true
-        ? 'OFFLINE_ESTIMATE'
+    final aiSource = result['is_demo_ai'] == true
+        ? 'DEMO_SIMULATED'
         : (result['success'] == true ? 'ROBOFLOW_REAL' : 'UNKNOWN');
     final priorityScore = _aiPriorityToPriorityScore(priorityLabel);
     String? severity;
     switch (priorityLabel?.toUpperCase()) {
+      case 'NONE':
+        severity = 'No Damage';
+        break;
       case 'CRITICAL':
         severity = 'Critical';
         break;
