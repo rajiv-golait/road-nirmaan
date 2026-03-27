@@ -15,10 +15,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../services/complaint_store.dart';
 import '../../services/legacy_dashboard_adapter.dart';
 import '../../services/dashboard_metrics.dart';
-import '../../services/ai_recommendation_service.dart';
-import '../../services/flask_ai_service.dart';
 import '../../services/ward_assignment_service.dart';
-import '../../utils/app_flags.dart';
 import '../../utils/map_tile_config.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 
@@ -2856,8 +2853,10 @@ class _ProfileViewState extends State<_ProfileView> {
                         child: const Text('Cancel'),
                       ),
                       TextButton(
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.pop(ctx); // Close dialog
+                          await AuthService.logoutAndSignOut();
+                          if (!context.mounted) return;
                           Navigator.pushNamedAndRemoveUntil(
                             context,
                             '/login',
@@ -6046,147 +6045,9 @@ class _ReportDamageScreenState extends State<_ReportDamageScreen> {
         ? WardAssignmentService.assignZone(coords.latitude, coords.longitude)
         : 'Unknown Area';
 
-    // Spatial dedup only when we have real GPS (no fake default coordinates).
-    if (coords != null) {
-      try {
-        final nearby = await ComplaintStore.instance.findNearbyOpenComplaints(
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-        );
-        final nearbyPayload = nearby.map((item) {
-          final c = item['coords'] as LatLng?;
-          return <String, dynamic>{
-            'id': item['id']?.toString(),
-            'lat': c?.latitude,
-            'lng': c?.longitude,
-            'status': item['status']?.toString(),
-          };
-        }).toList();
-        final dedup = await FlaskAiService.checkDuplicate(
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          nearbyComplaints: nearbyPayload,
-        );
-        if ((dedup['is_duplicate'] == true) &&
-            (dedup['master_id']?.toString().isNotEmpty == true)) {
-          await ComplaintStore.instance.addEvidenceToComplaint(
-            complaintId: dedup['master_id'].toString(),
-            localImagePaths: localPaths,
-          );
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Duplicate complaint found. Evidence attached to existing complaint.',
-              ),
-              backgroundColor: primary,
-            ),
-          );
-          return;
-        }
-      } catch (e) {
-        // Duplicate check failed — ask user what to do
-        final proceedAnyway = await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Duplicate check unavailable'),
-            content: const Text(
-              'Could not check for nearby reports. '
-              'Do you want to submit anyway? '
-              'Your report might be a duplicate.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Submit anyway'),
-              ),
-            ],
-          ),
-        );
-        if (proceedAnyway != true) return;
-      }
-    }
-
-    Map<String, dynamic>? aiResult;
+    String? complaintId;
     try {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Analyzing images with AI...'),
-            backgroundColor: primary,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-      aiResult = await FlaskAiService.analyzeImages(
-        images: _selectedPhotos,
-        latitude: coords?.latitude,
-        longitude: coords?.longitude,
-      );
-    } catch (e) {
-      debugPrint('AI Analysis fallback to local model: $e');
-      try {
-        aiResult = await AiRecommendationService.instance.analyzeSingleImage(
-          imagePath: localPaths.first,
-          latitude: coords?.latitude,
-          longitude: coords?.longitude,
-        );
-      } catch (fallbackErr) {
-        debugPrint('Local AI fallback failed: $fallbackErr');
-      }
-    }
-
-    String? severity;
-    double? severityScore;
-    double? epdoScore;
-    int? totalPotholes;
-    String? aiPriority;
-    String? aiSource;
-    if (aiResult == null) {
-      aiSource = 'UNKNOWN';
-    } else if (aiResult['is_offline_estimate'] == true) {
-      aiSource = 'OFFLINE_ESTIMATE';
-    } else if (aiResult['success'] == true) {
-      aiSource = 'ROBOFLOW_REAL';
-    } else {
-      aiSource = 'UNKNOWN';
-    }
-
-    if (aiResult != null && aiResult['success'] == true) {
-      final String priority = aiResult['priority']?.toString() ?? 'MEDIUM';
-      aiPriority = aiResult['priority']?.toString();
-      severity = priority == 'CRITICAL'
-          ? 'Critical'
-          : priority == 'HIGH'
-          ? 'High'
-          : priority == 'LOW'
-          ? 'Low'
-          : 'Medium';
-      severityScore = (aiResult['severity_score'] as num?)?.toDouble();
-      epdoScore = (aiResult['epdo_score'] as num?)?.toDouble() ?? 5.0;
-      totalPotholes = (aiResult['total_potholes'] as num?)?.toInt() ?? 1;
-
-      if (aiResult['is_offline_estimate'] == true && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Could not reach AI server. '
-              'Severity is an estimate. '
-              'Report will still be submitted.',
-            ),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 5),
-          ),
-        );
-      }
-    }
-
-    try {
-      await ComplaintStore.instance.createCitizenComplaintWithUploads(
+      complaintId = await ComplaintStore.instance.createCitizenComplaintWithUploads(
         title: '$effectiveCategory reported by citizen',
         description: _descriptionController.text.trim(),
         damageType: effectiveCategory,
@@ -6194,12 +6055,6 @@ class _ReportDamageScreenState extends State<_ReportDamageScreen> {
         ward: ward,
         coords: coords,
         localImagePaths: localPaths,
-        severity: severity,
-        severityScore: severityScore,
-        epdoScore: epdoScore,
-        totalPotholes: totalPotholes ?? 0,
-        aiPriority: aiPriority,
-        aiSource: aiSource,
         locationIsApproximate: locationIsApproximate,
       );
     } on ComplaintSaveException catch (e) {
@@ -6266,39 +6121,6 @@ class _ReportDamageScreenState extends State<_ReportDamageScreen> {
               'Your complaint has been registered in the backend and will be reviewed by municipal officials within 24-48 hours.',
               style: TextStyle(color: textSecondary, height: 1.4),
             ),
-            if (severityScore != null ||
-                epdoScore != null ||
-                (totalPotholes != null && totalPotholes! > 0) ||
-                aiPriority != null) ...[
-              const SizedBox(height: 12),
-              const Divider(),
-              const SizedBox(height: 8),
-              const Text(
-                'AI analysis',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-              const SizedBox(height: 6),
-              if (severityScore != null)
-                Text(
-                  'Severity score: ${severityScore.toStringAsFixed(1)} / 10',
-                  style: const TextStyle(fontSize: 12, color: textSecondary),
-                ),
-              if (epdoScore != null)
-                Text(
-                  'EPDO score: ${epdoScore.toStringAsFixed(1)} / 10',
-                  style: const TextStyle(fontSize: 12, color: textSecondary),
-                ),
-              if (totalPotholes != null && totalPotholes! > 0)
-                Text(
-                  'Potholes detected: $totalPotholes',
-                  style: const TextStyle(fontSize: 12, color: textSecondary),
-                ),
-              if (aiPriority != null)
-                Text(
-                  'Priority: $aiPriority',
-                  style: const TextStyle(fontSize: 12, color: textSecondary),
-                ),
-            ],
             if (coords != null) ...[
               const SizedBox(height: 12),
               const Divider(),
@@ -7029,6 +6851,3 @@ class _CameraScreenState extends State<_CameraScreen> {
     );
   }
 }
-
-
-

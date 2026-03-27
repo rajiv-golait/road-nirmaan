@@ -1956,6 +1956,7 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
   final TextEditingController _remarksController = TextEditingController();
   String? _selectedContractor;
   String? _selectedWorkGang;
+  bool _isRefreshingAi = false;
 
   final List<String> _contractors = [
     'Sharma Contractors Pvt Ltd',
@@ -1970,6 +1971,36 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
     'Gang C - Emergency Response',
     'Gang D - Night Shift Crew',
   ];
+
+  Future<void> _reloadAiAnalysis() async {
+    final complaintId = widget.data['id']?.toString();
+    if (complaintId == null || complaintId.isEmpty || _isRefreshingAi) return;
+
+    setState(() => _isRefreshingAi = true);
+    try {
+      final updated = await ComplaintStore.instance.generateAiRecommendation(
+        complaintId,
+      );
+      if (!mounted) return;
+      setState(() {
+        widget.data
+          ..clear()
+          ..addAll(updated);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to refresh AI analysis: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshingAi = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2323,7 +2354,87 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
   Widget _buildAiAssessmentSection() {
     final d = widget.data;
     if (!_jeHasAiAssessmentData(d)) {
-      return const SizedBox.shrink();
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFFC9A24D).withOpacity(0.35),
+            width: 1.2,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFC9A24D).withOpacity(0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome,
+                    size: 20,
+                    color: Color(0xFFC9A24D),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'AI Analysis',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _isRefreshingAi ? null : _reloadAiAnalysis,
+                  icon: _isRefreshingAi
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh_rounded, size: 16),
+                  label: Text(_isRefreshingAi ? 'Reloading' : 'Reload'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFC9A24D),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'AI analysis is in progress for this complaint.',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Scores and repair recommendations will appear here once processing finishes.',
+              style: TextStyle(color: Colors.white70, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: const LinearProgressIndicator(
+                minHeight: 6,
+                backgroundColor: Color(0x33475569),
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFC9A24D)),
+              ),
+            ),
+          ],
+        ),
+      );
     }
     final sev = d['severityScore'] as num?;
     final epdo = d['epdoScore'] as num?;
@@ -2403,9 +2514,24 @@ class _JEComplaintDetailScreenState extends State<_JEComplaintDetailScreen> {
                   color: Colors.white.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(
+              child: Text(
                   _jeHumanizeAiSource(src),
                   style: const TextStyle(fontSize: 10, color: Colors.white70),
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: _isRefreshingAi ? null : _reloadAiAnalysis,
+                icon: _isRefreshingAi
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded, size: 16),
+                label: Text(_isRefreshingAi ? 'Reloading' : 'Reload'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFC9A24D),
                 ),
               ),
             ],
@@ -4606,8 +4732,10 @@ class _ProfileViewState extends State<_ProfileView> {
                         child: const Text('Cancel'),
                       ),
                       TextButton(
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.pop(ctx); // Close dialog
+                          await AuthService.logoutAndSignOut();
+                          if (!context.mounted) return;
                           Navigator.pushNamedAndRemoveUntil(
                             context,
                             '/login',
@@ -8379,6 +8507,5 @@ class _CameraScreenState extends State<_CameraScreen> {
     );
   }
 }
-
 
 

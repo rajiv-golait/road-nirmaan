@@ -2811,8 +2811,10 @@ class _ProfileViewState extends State<_ProfileView> {
                         child: const Text('Cancel'),
                       ),
                       TextButton(
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.pop(ctx); // Close dialog
+                          await AuthService.logoutAndSignOut();
+                          if (!context.mounted) return;
                           Navigator.pushNamedAndRemoveUntil(
                             context,
                             '/login',

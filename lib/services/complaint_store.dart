@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
@@ -102,6 +103,7 @@ class ComplaintStore extends ChangeNotifier {
   List<Map<String, dynamic>> _complaints = [];
   final Set<String> _locallyReportedComplaintIds = <String>{};
   final Set<String> _locallyUpvotedComplaintIds = <String>{};
+  final Set<String> _pendingAiBackfillIds = <String>{};
   final Map<String, int> _localUpvoteDeltas = <String, int>{};
   final List<Map<String, dynamic>> _localOnlyComplaints =
       <Map<String, dynamic>>[];
@@ -507,6 +509,60 @@ class ComplaintStore extends ChangeNotifier {
     return complaints.map(_decorateComplaint).toList();
   }
 
+  bool _hasAiAssessmentData(Map<String, dynamic> complaint) {
+    final severityScore = complaint['severityScore'] as num?;
+    final epdoScore = complaint['epdoScore'] as num?;
+    final totalPotholes = complaint['totalPotholes'] as num?;
+    final priorityScore = complaint['priorityScore'] as num?;
+    final aiSource = (complaint['aiSource'] ?? '').toString().trim();
+    return severityScore != null ||
+        epdoScore != null ||
+        totalPotholes != null ||
+        priorityScore != null ||
+        (aiSource.isNotEmpty && aiSource.toUpperCase() != 'UNKNOWN');
+  }
+
+  void _scheduleAiRecommendationForComplaint(String complaintId) {
+    if (complaintId.isEmpty ||
+        complaintId.startsWith('LOCAL-') ||
+        _pendingAiBackfillIds.contains(complaintId)) {
+      return;
+    }
+    final complaint = getComplaintById(complaintId);
+    if (complaint == null || _hasAiAssessmentData(complaint)) return;
+    final images = ((complaint['images'] as List?) ?? const [])
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+    if (images.isEmpty) return;
+
+    _pendingAiBackfillIds.add(complaintId);
+    unawaited(
+      (() async {
+        try {
+          await generateAiRecommendation(complaintId);
+        } catch (_) {
+          // Best-effort AI enrichment for saved complaints.
+        } finally {
+          _pendingAiBackfillIds.remove(complaintId);
+        }
+      })(),
+    );
+  }
+
+  void _scheduleAiBackfillForMissingComplaints() {
+    for (final complaint in _complaints) {
+      final complaintId = complaint['id']?.toString();
+      if (complaintId == null ||
+          complaintId.isEmpty ||
+          complaintId.startsWith('LOCAL-') ||
+          _hasAiAssessmentData(complaint)) {
+        continue;
+      }
+      _scheduleAiRecommendationForComplaint(complaintId);
+    }
+  }
+
   Future<void> _hydrateUpvoteState() async {
     await _ensureLocalVoteStateLoaded();
     final useLocalVoteState = currentUserId == null;
@@ -563,44 +619,7 @@ class ComplaintStore extends ChangeNotifier {
       await _purgeSuppressedLocalState();
       _ensureJeMockCoverage();
 
-      // Force Mock Injection for Junior Engineer Unresolved Section
-      final hardcoded = _decorateComplaint({
-        'id': 'MOCK-JE-999',
-        'title': 'Severe Road Surface Depression at Railway Overbridge',
-        'description':
-            'Large sunken area near the railway overbridge expansion joint. Vehicles experience heavy impact when crossing. Critical safety concern for night-time traffic.',
-        'damageType': 'Subsidence',
-        'location': 'Railway Overbridge Approach, Solapur',
-        'ward': '',
-        'wardZone': '',
-        'severity': 'Medium',
-        'status': 'Open',
-        'submittedDate': DateTime.now().subtract(const Duration(minutes: 5)),
-        'lastUpdate': DateTime.now(),
-        'receivedAtCurrentLevel': DateTime.now().add(const Duration(days: 10)),
-        'currentHandler': 'JE',
-        'reportedBy': 'citizen',
-        'upvotes': 42,
-        'images': [
-          'assets/Screenshot 2026-03-17 022153.png',
-          'assets/Screenshot 2026-03-17 022153.png',
-        ],
-        'ai_analysis': {
-          'severity': 'High',
-          'damage_type': 'Subsidence',
-          'confidence': 0.94,
-          'detection_details': 'Significant vertical displacement detected at structural junction.',
-          'urgency_score': 88,
-        },
-        'severityScore': 8.5,
-        'epdoScore': 7.2,
-        'totalPotholes': 9,
-        'priorityScore': 9.0,
-        'aiSource': 'ROBOFLOW_REAL',
-      });
-      _complaints.removeWhere((c) => c['id'] == 'MOCK-JE-999');
-      _complaints.insert(0, hardcoded);
-
+      _scheduleAiBackfillForMissingComplaints();
       await _hydrateUpvoteState();
       _ensureHandlerFields();
       await runAutoEscalation();
@@ -615,44 +634,6 @@ class ComplaintStore extends ChangeNotifier {
         );
         _isShowingMockData = true;
       }
-      _complaints.removeWhere((c) => c['id'] == 'MOCK-JE-999');
-      _complaints.insert(
-        0,
-        _decorateComplaint({
-          'id': 'MOCK-JE-999',
-          'title': 'Severe Road Surface Depression at Railway Overbridge',
-          'description':
-              'Large sunken area near the railway overbridge expansion joint. Vehicles experience heavy impact when crossing. Critical safety concern for night-time traffic.',
-          'damageType': 'Subsidence',
-          'location': 'Railway Overbridge Approach, Solapur',
-          'ward': '',
-          'wardZone': '',
-          'severity': 'Medium',
-          'status': 'Open',
-          'submittedDate': DateTime.now().subtract(const Duration(minutes: 5)),
-          'lastUpdate': DateTime.now(),
-          'receivedAtCurrentLevel': DateTime.now().add(const Duration(days: 10)),
-          'currentHandler': 'JE',
-          'reportedBy': 'citizen',
-          'upvotes': 42,
-          'images': [
-            'assets/Screenshot 2026-03-17 022153.png',
-            'assets/Screenshot 2026-03-17 022153.png',
-          ],
-          'ai_analysis': {
-            'severity': 'High',
-            'damage_type': 'Subsidence',
-            'confidence': 0.94,
-            'detection_details': 'Significant vertical displacement detected at structural junction.',
-            'urgency_score': 88,
-          },
-          'severityScore': 8.5,
-          'epdoScore': 7.2,
-          'totalPotholes': 9,
-          'priorityScore': 9.0,
-          'aiSource': 'ROBOFLOW_REAL',
-        }),
-      );
       _complaints = _removeSuppressedComplaints(_complaints);
       await _purgeSuppressedLocalState();
       _ensureJeMockCoverage();
@@ -753,7 +734,6 @@ class ComplaintStore extends ChangeNotifier {
     return _complaints.where((complaint) {
       if (complaint['currentHandler'] != _kJE) return false;
       final ward = complaint['wardZone'] as String?;
-      if (complaint['id'] == 'MOCK-JE-999') return true;
       if (ward == null || ward.trim().isEmpty) return true;
       final normalized = ward.toLowerCase();
       if (normalized.contains('pending') || normalized.contains('unknown'))
@@ -1000,6 +980,9 @@ class ComplaintStore extends ChangeNotifier {
       await _persistLocalReportedIds();
     }
     _complaints.insert(0, mapped);
+    if (complaintId != null && complaintId.isNotEmpty) {
+      _scheduleAiRecommendationForComplaint(complaintId);
+    }
     notifyListeners();
     return complaintId;
   }
@@ -1090,9 +1073,6 @@ class ComplaintStore extends ChangeNotifier {
     }
 
     final coords = complaint['coords'] as LatLng?;
-    if (coords == null) {
-      throw Exception('Location coordinates are missing for this complaint.');
-    }
 
     final images = ((complaint['images'] as List?) ?? const [])
         .map((item) => item.toString().trim())
@@ -1107,29 +1087,52 @@ class ComplaintStore extends ChangeNotifier {
     try {
       result = await FlaskAiService.analyzeImages(
         images: [selectedImage],
-        latitude: coords.latitude,
-        longitude: coords.longitude,
+        latitude: coords?.latitude,
+        longitude: coords?.longitude,
       );
     } catch (_) {
       result = await AiRecommendationService.instance.analyzeSingleImage(
         imagePath: selectedImage,
-        latitude: coords.latitude,
-        longitude: coords.longitude,
+        latitude: coords?.latitude,
+        longitude: coords?.longitude,
       );
     }
 
     final recommendations = (result['repair_recommendations'] is Map)
         ? Map<String, dynamic>.from(result['repair_recommendations'] as Map)
         : <String, dynamic>{};
-    final aiBlock = _buildAiRecommendationBlock(recommendations);
-    final updatedRemarks = _upsertAiRemarkBlock(
-      (complaint['officialRemarks'] ?? '').toString(),
-      aiBlock,
-    );
+    final priorityLabel = result['priority']?.toString();
+    final severityScore = (result['severity_score'] as num?)?.toDouble();
+    final epdoScore = (result['epdo_score'] as num?)?.toDouble();
+    final totalPotholes = (result['total_potholes'] as num?)?.toInt();
+    final aiSource = result['is_offline_estimate'] == true
+        ? 'OFFLINE_ESTIMATE'
+        : (result['success'] == true ? 'ROBOFLOW_REAL' : 'UNKNOWN');
+    final priorityScore = _aiPriorityToPriorityScore(priorityLabel);
+    String? severity;
+    switch (priorityLabel?.toUpperCase()) {
+      case 'CRITICAL':
+        severity = 'Critical';
+        break;
+      case 'HIGH':
+        severity = 'High';
+        break;
+      case 'MEDIUM':
+        severity = 'Medium';
+        break;
+      case 'LOW':
+        severity = 'Low';
+        break;
+    }
 
     final updates = <String, dynamic>{
-      'officialRemarks': updatedRemarks,
       'lastUpdate': DateTime.now(),
+      if (severity != null) 'severity': severity,
+      if (severityScore != null) 'severityScore': severityScore,
+      if (epdoScore != null) 'epdoScore': epdoScore,
+      if (totalPotholes != null) 'totalPotholes': totalPotholes,
+      if (priorityScore != null) 'priorityScore': priorityScore,
+      'aiSource': aiSource,
       'aiRecommendation': recommendations,
       'aiResult': result,
       'aiInputImage': selectedImage,
@@ -1147,36 +1150,6 @@ class ComplaintStore extends ChangeNotifier {
       ..addAll(_decorateComplaint(complaint));
     notifyListeners();
     return Map<String, dynamic>.from(complaint);
-  }
-
-  String _buildAiRecommendationBlock(Map<String, dynamic> recommendation) {
-    final roadType = (recommendation['recommended_road_type'] ?? 'N/A')
-        .toString();
-    final workerType = (recommendation['worker_type'] ?? 'N/A').toString();
-    final urgency = (recommendation['urgency'] ?? 'N/A').toString();
-    final timeline = (recommendation['timeline'] ?? 'N/A').toString();
-    final summary = (recommendation['summary'] ?? 'No summary generated.')
-        .toString();
-    return [
-      'Road Type: $roadType',
-      'Worker Type: $workerType',
-      'Urgency: $urgency',
-      'Timeline: $timeline',
-      'Summary: $summary',
-    ].join('\n');
-  }
-
-  String _upsertAiRemarkBlock(String currentRemarks, String aiBlock) {
-    const marker = '[AI_RECOMMENDATION]';
-    final base = currentRemarks.trim();
-    final markerIndex = base.indexOf(marker);
-    final cleaned = markerIndex >= 0
-        ? base.substring(0, markerIndex).trimRight()
-        : base;
-    if (cleaned.isEmpty) {
-      return '$marker\n$aiBlock';
-    }
-    return '$cleaned\n\n$marker\n$aiBlock';
   }
 
   Future<void> saveOfficialRemarks(String complaintId, String remarks) async {

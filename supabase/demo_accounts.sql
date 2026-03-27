@@ -7,6 +7,12 @@
 --   je.zone1@demo.roadnirman.in
 --   contractor@demo.roadnirman.in
 --   commissioner@demo.roadnirman.in
+--   ac@demo.roadnirman.in
+--   ce@demo.roadnirman.in
+--   de.zone1@demo.roadnirman.in
+--   ae.zone1@demo.roadnirman.in
+--   workgang.zone1@demo.roadnirman.in
+--   nagarsevak.zone1@demo.roadnirman.in
 -- Password for each: Demo@Road2024
 --
 -- Requires user_roles.user_id (see schema.sql / migrate.sql).
@@ -17,8 +23,16 @@ FROM (
   VALUES
     ('citizen@demo.roadnirman.in', 'citizen', NULL::text),
     ('je.zone1@demo.roadnirman.in', 'junior_engineer', 'Zone 1'),
-    ('contractor@demo.roadnirman.in', 'contractor', NULL::text),
-    ('commissioner@demo.roadnirman.in', 'commissioner', NULL::text)
+    ('contractor@demo.roadnirman.in', 'contractor', 'Zone 1'),
+    ('commissioner@demo.roadnirman.in', 'commissioner', NULL::text),
+
+    -- Remaining dashboards
+    ('ac@demo.roadnirman.in', 'assistant_commissioner', NULL::text),
+    ('ce@demo.roadnirman.in', 'chief_engineer', NULL::text),
+    ('de.zone1@demo.roadnirman.in', 'deputy_engineer', 'Zone 1'),
+    ('ae.zone1@demo.roadnirman.in', 'assistant_engineer', 'Zone 1'),
+    ('workgang.zone1@demo.roadnirman.in', 'work_gang', 'Zone 1'),
+    ('nagarsevak.zone1@demo.roadnirman.in', 'nagarsevak', 'Zone 1')
 ) AS v(email, role, ward_zone)
 JOIN auth.users au ON LOWER(TRIM(au.email)) = LOWER(TRIM(v.email))
 ON CONFLICT (email) DO UPDATE SET

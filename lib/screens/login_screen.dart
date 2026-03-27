@@ -44,6 +44,9 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      // Always clear previous session/role before a new login attempt.
+      await AuthService.logoutAndSignOut();
+
       // FIX 5: Every login goes through Supabase Auth. No demo bypass.
       try {
         await Supabase.instance.client.auth.signInWithPassword(
@@ -62,7 +65,10 @@ class _LoginScreenState extends State<LoginScreen> {
       await ComplaintStore.instance.fetchComplaints();
 
       if (!mounted) return;
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => dashboard));
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => dashboard),
+        (route) => false,
+      );
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(

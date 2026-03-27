@@ -50,11 +50,9 @@ class AuthService {
 
   static void setUserFromEmail(String email) {
     final role = getRoleFromEmail(email);
-    if (role != null) {
-      _currentUserRole = role;
-      _currentUserEmail = email;
-      _currentUserId = Supabase.instance.client.auth.currentUser?.id;
-    }
+    _currentUserRole = role;
+    _currentUserEmail = email;
+    _currentUserId = Supabase.instance.client.auth.currentUser?.id;
   }
 
   static void setUser({
@@ -83,6 +81,15 @@ class AuthService {
       default:
         return false;
     }
+  }
+
+  static Future<void> logoutAndSignOut() async {
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } catch (_) {
+      // Ensure local auth cache is always cleared even when network fails.
+    }
+    logout();
   }
 }
 
@@ -180,9 +187,9 @@ bool isValidDemoCredentials(String email, String password) {
 }
 
 Future<Widget> loadDashboardForRole(String email, String password) async {
-  var role = AuthService.currentUserRole;
-  role ??= await resolveRoleForAuthenticatedUser(email);
-  if (role == null && AuthService.authenticate(email, password)) {
+  final normalizedEmail = email.trim().toLowerCase();
+  var role = await resolveRoleForAuthenticatedUser(normalizedEmail);
+  if (role == null && AuthService.authenticate(normalizedEmail, password)) {
     role = AuthService.currentUserRole;
   }
   if (role == null) {
