@@ -513,7 +513,7 @@ class MockDataSeeder {
           'Verified and assigned. Patching and compaction started on first lane.',
       'reported_by': 'citizen',
       'upvotes': 19,
-      'images': ['assets/download (6).jpg', 'assets/download (1).jpg'],
+      'images': ['assets/download (3).jpg', 'assets/download (2).jpg'],
       'days_ago': 2,
       'verified_days_ago': 1,
     },

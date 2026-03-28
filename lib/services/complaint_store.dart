@@ -124,6 +124,286 @@ class ComplaintStore extends ChangeNotifier {
   bool get isShowingMockData => _isShowingMockData;
   String? get currentUserId => Supabase.instance.client.auth.currentUser?.id;
 
+  List<Map<String, dynamic>> _buildJeCoverageComplaints() {
+    final now = DateTime.now();
+    return <Map<String, dynamic>>[
+      <String, dynamic>{
+        'id': 'CMP202603-901',
+        'title': 'Pothole cluster near market signal',
+        'description':
+            'Multiple potholes near the main junction causing sharp swerves during peak traffic.',
+        'damageType': 'Pothole',
+        'location': 'Market Signal Junction, Solapur',
+        'ward': '',
+        'wardZone': '',
+        'coords': const LatLng(17.6712, 75.9098),
+        'severity': 'High',
+        'status': 'Open',
+        'submittedDate': now.subtract(const Duration(days: 1)),
+        'lastUpdate': now.subtract(const Duration(hours: 6)),
+        'images': const <String>[
+          'assets/Screenshot 2026-03-17 022153.png',
+          'assets/Screenshot 2026-03-17 022201.png',
+        ],
+        'currentHandler': _kJE,
+        'receivedAtCurrentLevel': now.subtract(const Duration(days: 1)),
+        'reportedBy': 'citizen',
+        'upvotes': 17,
+      },
+      <String, dynamic>{
+        'id': 'CMP202603-902',
+        'title': 'Surface cracking verified near school zone',
+        'description':
+            'JE field visit completed. Site verified and contractor recommendation recorded.',
+        'damageType': 'Surface Crack',
+        'location': 'School Zone Road, Solapur',
+        'ward': '',
+        'wardZone': '',
+        'coords': const LatLng(17.6645, 75.9142),
+        'severity': 'Low',
+        'status': 'Verified',
+        'submittedDate': now.subtract(const Duration(hours: 18)),
+        'verifiedDate': now.subtract(const Duration(hours: 6)),
+        'lastUpdate': now.subtract(const Duration(hours: 2)),
+        'assignedTo': 'Sharma Contractors Pvt Ltd',
+        'assignedPartyType': 'Contractor',
+        'officialRemarks':
+            'Field verified by JE. Forward plan ready for contractor deployment.',
+        'images': const <String>[
+          'assets/Screenshot 2026-03-17 022206.png',
+          'assets/Screenshot 2026-03-17 022214.png',
+        ],
+        'currentHandler': _kJE,
+        'receivedAtCurrentLevel': now.subtract(const Duration(hours: 18)),
+        'reportedBy': 'citizen',
+        'upvotes': 11,
+      },
+      <String, dynamic>{
+        'id': 'CMP202603-903',
+        'title': 'Drain edge repair completed on ring road',
+        'description':
+            'Repair work completed and complaint kept in JE history for reference.',
+        'damageType': 'Edge Erosion',
+        'location': 'Inner Ring Road, Solapur',
+        'ward': '',
+        'wardZone': '',
+        'coords': const LatLng(17.6768, 75.9206),
+        'severity': 'Low',
+        'status': 'Resolved',
+        'submittedDate': now.subtract(const Duration(days: 6)),
+        'verifiedDate': now.subtract(const Duration(days: 4)),
+        'lastUpdate': now.subtract(const Duration(days: 1)),
+        'assignedTo': 'Gang B - Surface Repair Unit',
+        'assignedPartyType': 'Work Gang',
+        'workGang': 'Gang B - Surface Repair Unit',
+        'officialRemarks':
+            'Repair completed and site cleared after JE follow-up inspection.',
+        'images': const <String>[
+          'assets/Screenshot 2026-03-17 022223.png',
+          'assets/Screenshot 2026-03-17 022232.png',
+        ],
+        'currentHandler': _kJE,
+        'receivedAtCurrentLevel': now.subtract(const Duration(days: 6)),
+        'reportedBy': 'citizen',
+        'upvotes': 9,
+      },
+      <String, dynamic>{
+        'id': 'CMP202603-904',
+        'title': 'Carriageway settlement verified near bus depot',
+        'description':
+            'JE inspection completed. Settlement zone marked and contractor assignment recommended.',
+        'damageType': 'Subsidence',
+        'location': 'Bus Depot Link Road, Solapur',
+        'ward': '',
+        'wardZone': '',
+        'coords': const LatLng(17.6724, 75.9244),
+        'severity': 'Low',
+        'status': 'Verified',
+        'submittedDate': now.subtract(const Duration(hours: 20)),
+        'verifiedDate': now.subtract(const Duration(hours: 8)),
+        'lastUpdate': now.subtract(const Duration(hours: 3)),
+        'assignedTo': 'Metro Build Infra',
+        'assignedPartyType': 'Contractor',
+        'officialRemarks':
+            'Verified by JE. Escalation not required; contractor mobilization planned.',
+        'images': const <String>[
+          'assets/Screenshot 2026-03-17 022238.png',
+          'assets/Screenshot 2026-03-17 022243.png',
+        ],
+        'currentHandler': _kJE,
+        'receivedAtCurrentLevel': now.subtract(const Duration(hours: 20)),
+        'reportedBy': 'citizen',
+        'upvotes': 14,
+      },
+      <String, dynamic>{
+        'id': 'CMP202603-905',
+        'title': 'Patchwork completed near college approach road',
+        'description':
+            'Complaint closed after work gang completed patching and JE signed off the site.',
+        'damageType': 'Pothole',
+        'location': 'College Approach Road, Solapur',
+        'ward': '',
+        'wardZone': '',
+        'coords': const LatLng(17.6688, 75.9076),
+        'severity': 'Medium',
+        'status': 'Resolved',
+        'submittedDate': now.subtract(const Duration(days: 9)),
+        'verifiedDate': now.subtract(const Duration(days: 6)),
+        'lastUpdate': now.subtract(const Duration(days: 2)),
+        'assignedTo': 'Gang A - Road Repair Unit',
+        'assignedPartyType': 'Work Gang',
+        'workGang': 'Gang A - Road Repair Unit',
+        'officialRemarks':
+            'Repair completed and marked resolved after JE field confirmation.',
+        'images': const <String>[
+          'assets/Screenshot 2026-03-17 022251.png',
+          'assets/Screenshot 2026-03-17 022302.png',
+        ],
+        'currentHandler': _kJE,
+        'receivedAtCurrentLevel': now.subtract(const Duration(days: 9)),
+        'reportedBy': 'citizen',
+        'upvotes': 8,
+      },
+      <String, dynamic>{
+        'id': 'CMP202603-906',
+        'title': 'Rapid pothole spread near textile chowk',
+        'description':
+            'Recent rainfall has widened multiple potholes on the approach lane. Vehicles are shifting abruptly to avoid impact.',
+        'damageType': 'Pothole',
+        'location': 'Textile Chowk Connector, Solapur',
+        'ward': '',
+        'wardZone': '',
+        'coords': const LatLng(17.6701, 75.9116),
+        'severity': 'High',
+        'status': 'Open',
+        'submittedDate': now.subtract(const Duration(days: 1)),
+        'lastUpdate': now.subtract(const Duration(hours: 8)),
+        'images': const <String>[
+          'assets/Screenshot 2026-03-17 022322.png',
+          'assets/Screenshot 2026-03-17 022330.png',
+        ],
+        'currentHandler': _kJE,
+        'receivedAtCurrentLevel': now.subtract(const Duration(days: 1)),
+        'reportedBy': 'citizen',
+        'upvotes': 13,
+      },
+      <String, dynamic>{
+        'id': 'CMP202603-907',
+        'title': 'Verified shoulder damage near hospital road',
+        'description':
+            'JE site visit completed. Shoulder edge damage assessed and work-gang assignment prepared.',
+        'damageType': 'Edge Erosion',
+        'location': 'Hospital Access Road, Solapur',
+        'ward': '',
+        'wardZone': '',
+        'coords': const LatLng(17.6667, 75.9181),
+        'severity': 'Medium',
+        'status': 'Verified',
+        'submittedDate': now.subtract(const Duration(days: 5)),
+        'verifiedDate': now.subtract(const Duration(days: 2)),
+        'lastUpdate': now.subtract(const Duration(hours: 16)),
+        'assignedTo': 'Gang C - Rapid Patch Team',
+        'assignedPartyType': 'Work Gang',
+        'workGang': 'Gang C - Rapid Patch Team',
+        'officialRemarks':
+            'Field verified and scheduled for municipal work-gang intervention.',
+        'images': const <String>[
+          'assets/Screenshot 2026-03-17 022338.png',
+          'assets/Screenshot 2026-03-17 022358.png',
+        ],
+        'currentHandler': _kJE,
+        'receivedAtCurrentLevel': now.subtract(const Duration(days: 5)),
+        'reportedBy': 'citizen',
+        'upvotes': 10,
+      },
+      <String, dynamic>{
+        'id': 'CMP202603-908',
+        'title': 'Resolved patch settlement near old market lane',
+        'description':
+            'Complaint closed after JE confirmed completed patching and safe traffic flow restoration.',
+        'damageType': 'Surface Damage',
+        'location': 'Old Market Lane, Solapur',
+        'ward': '',
+        'wardZone': '',
+        'coords': const LatLng(17.6734, 75.9059),
+        'severity': 'Low',
+        'status': 'Resolved',
+        'submittedDate': now.subtract(const Duration(days: 11)),
+        'verifiedDate': now.subtract(const Duration(days: 8)),
+        'lastUpdate': now.subtract(const Duration(days: 3)),
+        'assignedTo': 'Metro Build Infra',
+        'assignedPartyType': 'Contractor',
+        'officialRemarks':
+            'JE closure recorded after patch compaction and final inspection.',
+        'images': const <String>[
+          'assets/Screenshot 2026-03-17 022407.png',
+          'assets/Screenshot 2026-03-17 022420.png',
+        ],
+        'currentHandler': _kJE,
+        'receivedAtCurrentLevel': now.subtract(const Duration(days: 11)),
+        'reportedBy': 'citizen',
+        'upvotes': 7,
+      },
+      <String, dynamic>{
+        'id': 'CMP202603-909',
+        'title': 'Verified carriageway cracks near temple approach',
+        'description':
+            'JE verification complete. Contractor-ready estimate and remarks recorded for next action.',
+        'damageType': 'Surface Crack',
+        'location': 'Temple Approach Road, Solapur',
+        'ward': '',
+        'wardZone': '',
+        'coords': const LatLng(17.6694, 75.9162),
+        'severity': 'Low',
+        'status': 'Verified',
+        'submittedDate': now.subtract(const Duration(hours: 16)),
+        'verifiedDate': now.subtract(const Duration(hours: 5)),
+        'lastUpdate': now.subtract(const Duration(hours: 1)),
+        'assignedTo': 'Sharma Contractors Pvt Ltd',
+        'assignedPartyType': 'Contractor',
+        'officialRemarks':
+            'JE site verification completed. Awaiting execution scheduling.',
+        'images': const <String>[
+          'assets/images (2).jpg',
+          'assets/Screenshot 2026-03-17 022206.png',
+        ],
+        'currentHandler': _kJE,
+        'receivedAtCurrentLevel': now.subtract(const Duration(hours: 16)),
+        'reportedBy': 'citizen',
+        'upvotes': 12,
+      },
+      <String, dynamic>{
+        'id': 'CMP202603-910',
+        'title': 'Resolved shoulder patch near industrial lane',
+        'description':
+            'Resolved after contractor patchwork and final JE closure entry.',
+        'damageType': 'Edge Erosion',
+        'location': 'Industrial Lane Service Road, Solapur',
+        'ward': '',
+        'wardZone': '',
+        'coords': const LatLng(17.6773, 75.9139),
+        'severity': 'Low',
+        'status': 'Resolved',
+        'submittedDate': now.subtract(const Duration(days: 13)),
+        'verifiedDate': now.subtract(const Duration(days: 9)),
+        'lastUpdate': now.subtract(const Duration(days: 4)),
+        'assignedTo': 'Gang D - Maintenance Crew',
+        'assignedPartyType': 'Work Gang',
+        'workGang': 'Gang D - Maintenance Crew',
+        'officialRemarks':
+            'Closed after JE confirmed edge patching and shoulder compaction.',
+        'images': const <String>[
+          'assets/images (3).jpg',
+          'assets/Screenshot 2026-03-17 022251.png',
+        ],
+        'currentHandler': _kJE,
+        'receivedAtCurrentLevel': now.subtract(const Duration(days: 13)),
+        'reportedBy': 'citizen',
+        'upvotes': 6,
+      },
+    ].map(_decorateComplaint).toList();
+  }
+
   void initialize() {
     if (_initialized) return;
     _subscribeToComplaintChanges();
@@ -295,79 +575,24 @@ class ComplaintStore extends ChangeNotifier {
   }
 
   void _ensureJeMockCoverage() {
-    if (!AppFlags.allowMockData) return;
-    final currentJe = _complaints.where((complaint) {
-      final handler = (complaint['currentHandler'] ?? '').toString();
-      if (handler != _kJE) return false;
-      final ward = (complaint['wardZone'] ?? '').toString();
-      return _kJePrimaryWards.any((w) => ward.contains(w) || w.contains(ward));
-    }).toList();
-    final hasJeAssigned = currentJe.any((complaint) {
-      final status = (complaint['status'] ?? '')
-          .toString()
-          .trim()
-          .toLowerCase();
-      final assignedTo = (complaint['assignedTo'] ?? '').toString().trim();
-      final assignedPartyType = (complaint['assignedPartyType'] ?? '')
-          .toString()
-          .trim();
-      final workGang = (complaint['workGang'] ?? '').toString().trim();
-      final isAssigned =
-          assignedTo.isNotEmpty ||
-          assignedPartyType.isNotEmpty ||
-          workGang.isNotEmpty;
-      final isVerifiedStage =
-          status == 'verified' ||
-          status == 'inprogress' ||
-          status == 'pendingceapproval' ||
-          status == 'resolved';
-      return isAssigned && isVerifiedStage;
-    });
-
-    // Removed early return to ensure NEWLY added mock complaints (like MOCK-022) 
-    // are injected even if JE already has some base data.
     final existingIds = _complaints
         .map((complaint) => complaint['id']?.toString())
         .whereType<String>()
         .toSet();
-    final jeMock = MockDataSeeder.instance.buildLocalMockComplaints().where((
-      complaint,
-    ) {
-      final handler = (complaint['currentHandler'] ?? '').toString();
-      if (handler != _kJE) return false;
-      final id = (complaint['id'] ?? '').toString();
-      final ward = (complaint['wardZone'] ?? '').toString();
-      if (id == 'MOCK-0222' || id == 'MOCK-022') return true;
-      if (!_kJePrimaryWards.any((w) => ward.contains(w) || w.contains(ward)))
-        return false;
-      if (currentJe.isEmpty) return true;
-      // If JE has only "new" cards, inject verified+assigned mock cards.
-      final status = (complaint['status'] ?? '')
-          .toString()
-          .trim()
-          .toLowerCase();
-      final assignedTo = (complaint['assignedTo'] ?? '').toString().trim();
-      final assignedPartyType = (complaint['assignedPartyType'] ?? '')
-          .toString()
-          .trim();
-      final workGang = (complaint['workGang'] ?? '').toString().trim();
-      final isAssigned =
-          assignedTo.isNotEmpty ||
-          assignedPartyType.isNotEmpty ||
-          workGang.isNotEmpty;
-      final isVerifiedStage =
-          status == 'verified' ||
-          status == 'inprogress' ||
-          status == 'pendingceapproval' ||
-          status == 'resolved';
-      return isAssigned && isVerifiedStage;
-    });
+    final sectionCoverage = _buildJeCoverageComplaints();
 
-    for (final complaint in jeMock) {
+    for (final complaint in sectionCoverage) {
       final id = complaint['id']?.toString();
-      if (id == null || id.isEmpty || existingIds.contains(id)) continue;
-      _complaints.add(Map<String, dynamic>.from(complaint));
-      existingIds.add(id);
+      if (id == null || id.isEmpty) continue;
+      final index = _complaints.indexWhere(
+        (item) => item['id']?.toString() == id,
+      );
+      if (index >= 0) {
+        _complaints[index] = Map<String, dynamic>.from(complaint);
+      } else {
+        _complaints.add(Map<String, dynamic>.from(complaint));
+        existingIds.add(id);
+      }
     }
   }
 

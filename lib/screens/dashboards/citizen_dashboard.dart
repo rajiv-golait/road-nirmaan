@@ -43,6 +43,28 @@ ImageProvider<Object> _complaintImageProvider(String path) {
   return AssetImage(path);
 }
 
+const List<String> _fallbackComplaintAssets = <String>[
+  'assets/Screenshot 2026-03-17 022153.png',
+  'assets/Screenshot 2026-03-17 022201.png',
+  'assets/Screenshot 2026-03-17 022206.png',
+  'assets/Screenshot 2026-03-17 022214.png',
+  'assets/Screenshot 2026-03-17 022223.png',
+  'assets/images (2).jpg',
+  'assets/images (3).jpg',
+  'assets/images (4).jpg',
+  'assets/images (5).jpg',
+  'assets/images (6).jpg',
+];
+
+String _fallbackComplaintAssetFor(String seed) {
+  final normalized = seed.trim();
+  var hash = 17;
+  for (final code in normalized.codeUnits) {
+    hash = (hash * 31 + code) & 0x7fffffff;
+  }
+  return _fallbackComplaintAssets[hash % _fallbackComplaintAssets.length];
+}
+
 class CitizenDashboard extends StatefulWidget {
   const CitizenDashboard({super.key});
 
@@ -1193,12 +1215,9 @@ class _ComplaintDetailScreenState extends State<_ComplaintDetailScreen> {
                             image: _complaintImageProvider(imagePath),
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
-                                Container(
-                                  color: surface,
-                                  child: const Icon(
-                                    Icons.broken_image,
-                                    color: textSecondary,
-                                  ),
+                                Image.asset(
+                                  _fallbackComplaintAssetFor(imagePath),
+                                  fit: BoxFit.cover,
                                 ),
                           ),
                         ),
@@ -5249,28 +5268,11 @@ class _ComplaintCard extends StatelessWidget {
                       child: Image(
                         image: _complaintImageProvider(images[i].toString()),
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: surface,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.warning_amber_rounded,
-                                color: textSecondary,
-                                size: 32,
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                "Road damage image",
-                                style: TextStyle(
-                                  color: textSecondary,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        errorBuilder: (context, error, stackTrace) =>
+                            Image.asset(
+                              _fallbackComplaintAssetFor(images[i].toString()),
+                              fit: BoxFit.cover,
+                            ),
                       ),
                     ),
                   );
